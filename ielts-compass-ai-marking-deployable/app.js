@@ -89,7 +89,7 @@ const defaultState = {
   review: { wins: '', blockers: '', next: '' },
   reminder: { enabled: false, time: '20:30', text: '该交今日雅思打卡了：刷题 + 错题 + 输出记录' },
   practice: { attempts: [], wrongbook: [], currentSet: 'reading', currentIndex: 0 },
-  mock: { attempts: [], currentTestId: fullTests[0]?.id || '', answers: {}, startedAt: null, remaining: 0 },
+  mock: { attempts: [], currentTestId: fullTests[0]?.id || '', answers: {}, startedAt: null, remaining: 0, audioNames: {}, audioUrls: {}, audioRates: {} },
   vocab: coreWords.slice(0, 6).map(createWordCard),
   outputs: [],
   aiFeedback: null
@@ -115,7 +115,7 @@ function bindEvents() {
   $$('.sidebar a').forEach(a => a.addEventListener('click', () => $('.sidebar').classList.remove('open')));
   $$('[data-practice]').forEach(btn => btn.addEventListener('click', () => switchPractice(btn.dataset.practice)));
   $('#startPracticeBtn').addEventListener('click', togglePracticeTimer); $('#resetPracticeBtn').addEventListener('click', resetPractice); $('#submitAnswerBtn').addEventListener('click', submitAnswer); $('#nextQuestionBtn').addEventListener('click', nextQuestion); $('#clearMasteredBtn').addEventListener('click', clearMastered);
-  $('#startMockBtn').addEventListener('click', startMock); $('#submitMockBtn').addEventListener('click', submitMock); $('#mockSelect').addEventListener('change', async () => { state.mock.currentTestId = $('#mockSelect').value; state.mock.answers = {}; state.mock.startedAt = null; state.mock.remaining = 0; await saveState(); renderMock(); });
+  $('#startMockBtn').addEventListener('click', startMock); $('#submitMockBtn').addEventListener('click', submitMock); $('#mockSelect').addEventListener('change', async () => { state.mock.currentTestId = $('#mockSelect').value; state.mock.answers = {}; state.mock.startedAt = null; state.mock.remaining = 0; await saveState(); renderMock(); }); document.addEventListener('change', handleMockAudioChange); document.addEventListener('click', handleMockAudioClick);
   $('#newPromptBtn').addEventListener('click', () => { currentPromptIndex = (currentPromptIndex + 1) % outputPrompts.length; renderOutputPrompt(); });
   $('#wordForm').addEventListener('submit', addWord);
   $('#seedWordsBtn').addEventListener('click', seedMoreWords);
@@ -145,9 +145,55 @@ function renderWrongbook() { const list = $('#wrongbookList'); const wrongs = (s
 function renderMockSelect() { const select = $('#mockSelect'); if (!select || select.options.length) return; fullTests.forEach(test => { const option = document.createElement('option'); option.value = test.id; option.textContent = test.title; select.appendChild(option); }); if (!state.mock.currentTestId && fullTests[0]) state.mock.currentTestId = fullTests[0].id; select.value = state.mock.currentTestId; }
 function currentMock() { return fullTests.find(test => test.id === state.mock.currentTestId) || fullTests[0]; }
 function renderMock() { const test = currentMock(); const area = $('#mockArea'); if (!test) { area.innerHTML = '<p class="empty">暂无模拟题。</p>'; return; } $('#mockTimer').textContent = state.mock.remaining ? formatSeconds(state.mock.remaining) : `${test.minutes}:00`; area.innerHTML = `${renderListeningSection(test)}${renderReadingSection(test)}`; area.querySelectorAll('[data-mock-q]').forEach(input => { const key = input.dataset.mockQ; input.checked = state.mock.answers[key] === Number(input.value); input.addEventListener('change', async () => { state.mock.answers[key] = Number(input.value); await saveState(); }); }); }
-function renderListeningSection(test) { return `<article class="mock-section"><div class="mock-section-head"><span>Listening</span><button type="button" onclick="speakMockScript()">播放听力</button></div><h3>${escapeHTML(test.listening.title)}</h3><p class="audio-script">${escapeHTML(test.listening.script)}</p>${renderMockQuestions(test.listening.questions)}</article>`; }
+function renderListeningSection(test) {
+  const uploadedUrl = state.mock.audioUrls?.[test.id] || '';
+  const uploadedName = state.mock.audioNames?.[test.id] || '';
+  const rate = state.mock.audioRates?.[test.id] || '1';
+  return `<article class="mock-section listening-real"><div class="mock-section-head"><span>Listening</span><a class="source-link" href="https://takeielts.britishcouncil.org/take-ielts/prepare/free-ielts-english-practice-tests/listening" target="_blank" rel="noopener noreferrer">官方听力入口</a></div><h3>${escapeHTML(test.listening.title)}</h3><div class="real-audio-card"><div><strong>用真实音频练这一套</strong><p>上传你自己合法拥有的 MP3 / M4A / WAV。系统只在当前浏览器播放，不会上传到服务器。</p></div><label class="file-import audio-upload">上传音频<input data-audio-upload="${test.id}" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg"></label>${uploadedUrl ? `<audio id="mockAudioPlayer" controls preload="metadata" src="${uploadedUrl}"></audio><div class="audio-meta"><span>${escapeHTML(uploadedName || '已加载本地音频')}</span><label>速度<select id="audioRateSelect" data-audio-rate="${test.id}"><option value="0.75" ${rate === '0.75' ? 'selected' : ''}>0.75x</option><option value="0.9" ${rate === '0.9' ? 'selected' : ''}>0.9x</option><option value="1" ${rate === '1' ? 'selected' : ''}>1x</option><option value="1.15" ${rate === '1.15' ? 'selected' : ''}>1.15x</option></select></label><button class="text-btn" type="button" data-clear-audio="${test.id}">移除音频</button></div>` : `<p class="empty audio-empty">还没有上传真实音频。你可以先打开官方听力入口练习，或上传自己已有的音频文件。</p>`}</div><details class="script-details"><summary>备用：查看脚本 / 机器朗读</summary><p class="audio-script">${escapeHTML(test.listening.script)}</p><button type="button" class="ghost-btn" onclick="speakMockScript()">备用朗读脚本</button></details>${renderMockQuestions(test.listening.questions)}</article>`;
+}
 function renderReadingSection(test) { return `<article class="mock-section"><div class="mock-section-head"><span>Reading</span></div><h3>${escapeHTML(test.reading.title)}</h3><p>${escapeHTML(test.reading.passage)}</p>${renderMockQuestions(test.reading.questions)}</article>`; }
 function renderMockQuestions(questions) { return questions.map(q => `<div class="mock-question"><strong>${escapeHTML(q.text)}</strong>${q.options.map((opt, index) => `<label><input type="radio" name="${q.id}" data-mock-q="${q.id}" value="${index}"> ${String.fromCharCode(65 + index)}. ${escapeHTML(opt)}</label>`).join('')}</div>`).join(''); }
+
+async function handleMockAudioChange(event) {
+  const fileInput = event.target.closest('[data-audio-upload]');
+  const rateSelect = event.target.closest('[data-audio-rate]');
+  if (fileInput) {
+    const testId = fileInput.dataset.audioUpload;
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('audio/')) { alert('请上传 MP3、M4A、WAV 等音频文件。'); return; }
+    if (!state.mock.audioUrls) state.mock.audioUrls = {};
+    if (!state.mock.audioNames) state.mock.audioNames = {};
+    const previous = state.mock.audioUrls[testId];
+    if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous);
+    state.mock.audioUrls[testId] = URL.createObjectURL(file);
+    state.mock.audioNames[testId] = file.name;
+    await saveState();
+    renderMock();
+    const audio = $('#mockAudioPlayer');
+    if (audio) audio.playbackRate = Number(state.mock.audioRates?.[testId] || 1);
+  }
+  if (rateSelect) {
+    const testId = rateSelect.dataset.audioRate;
+    if (!state.mock.audioRates) state.mock.audioRates = {};
+    state.mock.audioRates[testId] = rateSelect.value;
+    const audio = $('#mockAudioPlayer');
+    if (audio) audio.playbackRate = Number(rateSelect.value);
+    await saveState();
+  }
+}
+async function handleMockAudioClick(event) {
+  const clear = event.target.closest('[data-clear-audio]');
+  if (!clear) return;
+  const testId = clear.dataset.clearAudio;
+  const previous = state.mock.audioUrls?.[testId];
+  if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous);
+  delete state.mock.audioUrls?.[testId];
+  delete state.mock.audioNames?.[testId];
+  await saveState();
+  renderMock();
+}
+
 window.speakMockScript = function speakMockScript() { const test = currentMock(); if (!('speechSynthesis' in window) || !test) { alert('当前浏览器不支持语音播放。'); return; } speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(test.listening.script.replace('Audio script:', '')); utterance.lang = 'en-US'; utterance.rate = 0.86; speechSynthesis.speak(utterance); };
 async function startMock() { const test = currentMock(); if (!test) return; state.mock.answers = {}; state.mock.startedAt = new Date().toISOString(); state.mock.remaining = test.minutes * 60; clearInterval(mockInterval); mockInterval = setInterval(() => { state.mock.remaining = Math.max(0, state.mock.remaining - 1); $('#mockTimer').textContent = formatSeconds(state.mock.remaining); if (state.mock.remaining === 0) submitMock(); }, 1000); await saveState(); renderMock(); $('#mockResult').innerHTML = '<p class="empty">考试已开始。请按真实考试状态完成听力和阅读。</p>'; }
 async function submitMock() { const test = currentMock(); if (!test) return; clearInterval(mockInterval); mockInterval = null; const all = [...test.listening.questions, ...test.reading.questions]; let correct = 0; const details = all.map(q => { const chosen = state.mock.answers[q.id]; const ok = chosen === q.answer; if (ok) correct += 1; return `<li class="${ok ? 'ok' : 'bad'}"><strong>${escapeHTML(q.text)}</strong><br>你的答案：${chosen === undefined ? '未作答' : escapeHTML(q.options[chosen])}；正确答案：${escapeHTML(q.options[q.answer])}<br>${escapeHTML(q.explanation)}</li>`; }).join(''); const score = Math.round(correct / all.length * 100); state.mock.attempts.unshift({ id: crypto.randomUUID(), date: new Date().toLocaleString(), testId: test.id, correct, total: all.length, score }); await saveState(); $('#mockResult').innerHTML = `<h3>自动判分：${correct}/${all.length} · ${score}%</h3><p>${estimateBand(score)}</p><ol>${details}</ol>`; }

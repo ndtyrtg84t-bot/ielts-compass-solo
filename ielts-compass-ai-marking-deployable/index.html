@@ -221,6 +221,11 @@
               <button id="knowWordBtn" class="ghost-btn" type="button">认识</button>
             </div>
           </article>
+        <div class="scribble-pad">
+          <div><strong>手写草稿纸</strong><span>一边写一边背，适合默写、造句、画同义词网络</span></div>
+          <canvas id="scribbleCanvas" width="900" height="360" aria-label="单词手写草稿纸"></canvas>
+          <div class="scribble-actions"><button id="clearScribbleBtn" class="ghost-btn" type="button">清空草稿纸</button></div>
+        </div>
           <details class="word-form word-form-details">
             <summary>手动添加自己的单词</summary>
             <form id="wordForm" class="word-form-inner" autocomplete="off">
@@ -263,11 +268,6 @@
           <p id="vocabImportStatus" class="muted">导入后会自动进入记忆曲线复习。</p>
         </div>
 
-        <div class="scribble-pad">
-          <div><strong>手写草稿纸</strong><span>一边写一边背，适合默写、造句、画同义词网络</span></div>
-          <canvas id="scribbleCanvas" width="900" height="360" aria-label="单词手写草稿纸"></canvas>
-          <div class="scribble-actions"><button id="clearScribbleBtn" class="ghost-btn" type="button">清空草稿纸</button></div>
-        </div>
         <div id="wordList" class="word-list"></div>
       </section>
 

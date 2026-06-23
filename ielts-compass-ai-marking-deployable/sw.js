@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ielts-compass-momo-vocab-v17';
+const CACHE_NAME = 'ielts-compass-scribble-up-v18';
 const ASSETS = [
   './',
   './index.html',

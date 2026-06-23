@@ -144,10 +144,17 @@
           </div>
           <div class="pdf-mode-tabs"><button class="chip active" data-pdf-mode="reading" type="button">阅读 60min</button><button class="chip" data-pdf-mode="listening" type="button">听力 30min</button><button class="chip" data-pdf-mode="custom" type="button">自定义</button></div>
         </div>
+        <div class="built-in-pdf-library">
+          <div>
+            <strong>我的真题本</strong>
+            <span>私人内置 PDF，打开网站后直接加载；点“像考试一样切题”会生成 Reading Passage / Listening Section 小套题。</span>
+          </div>
+          <div id="builtInPdfList" class="built-in-pdf-list"></div>
+        </div>
         <div class="test-import-card">
           <div>
             <strong>真题套题导入</strong>
-            <span>可单套导入，也可批量自动分组</span>
+            <span>配套听力在这里上传；可给内置真题自动匹配音频</span>
           </div>
           <form id="testBundleForm" class="test-bundle-form">
             <label>套题名称<input id="testBundleName" type="text" placeholder="例如：Test 1 / Cambridge 18 Test 1"></label>
@@ -164,7 +171,7 @@
             <label class="file-import">选择音频总文件夹<input id="folderBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" webkitdirectory directory multiple></label>
             <button type="submit">按文件夹匹配音频</button>
           </form>
-          <p id="bulkBundleStatus" class="muted">PDF 可以批量选；音频可以批量选文件，也可以选择“音频4-19”总文件夹。系统会按 剑4 /【4】/Cambridge 4 / 真题4 自动配对。</p>
+          <p id="bulkBundleStatus" class="muted">内置真题 4-19 已在上方。配套听力上传方法：选择“音频总文件夹”，点“按文件夹匹配音频”，系统会按 剑4 /【4】/Cambridge 4 / C18 / 真题19 自动生成带音频的套题卡片；也可以用“单独上传音频”给当前 PDF 临时播放。</p>
           <div id="testBundleList" class="test-bundle-list"></div>
         </div>
         <div class="pdf-toolbar">

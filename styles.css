@@ -619,3 +619,85 @@ body { font-size: clamp(16px, .95vw, 18px); }
 .pdf-segment-card.is-auto { border-style: dashed; background: color-mix(in oklch, var(--paper), var(--gold) 12%); }
 .pdf-segment-card.is-auto strong::after { content: ' AUTO'; display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 999px; background: var(--ink); color: var(--cream); font-size: .68rem; letter-spacing: .04em; vertical-align: middle; }
 @media (max-width: 920px) { .pdf-segment-form #pdfAutoSegmentBtn { grid-column: 1 / -1; } }
+
+
+/* v25: responsive guardrails for PDF drill — no overlap, no horizontal spill */
+.pdf-panel, .pdf-panel * { box-sizing: border-box; }
+.pdf-panel { overflow-x: clip; }
+.pdf-panel .pdf-layout,
+.pdf-focus-mode .pdf-layout { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: clamp(14px, 2vw, 22px); width: 100%; max-width: 100%; }
+.pdf-viewer-card,
+.answer-sheet-card,
+.pdf-segment-builder,
+.pdf-text-shell,
+.pdf-canvas-shell { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.pdf-segment-builder { overflow: hidden; padding: clamp(12px, 2.4vw, 18px); }
+.pdf-segment-builder > div:first-child,
+.pdf-auto-segment-hint,
+.pdf-segment-card span { max-width: 100%; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.pdf-segment-form { grid-template-columns: minmax(0, 1.35fr) repeat(3, minmax(72px, .55fr)); align-items: end; width: 100%; max-width: 100%; }
+.pdf-segment-form label,
+.pdf-segment-form input,
+.pdf-segment-form button { min-width: 0; max-width: 100%; }
+.pdf-segment-form button { white-space: normal; min-height: 48px; padding-inline: 14px; }
+.pdf-segment-form button[type="submit"],
+.pdf-segment-form #pdfAutoSegmentBtn { grid-column: span 2; }
+.pdf-segment-list { min-width: 0; }
+.pdf-segment-card { min-width: 0; overflow: hidden; }
+.pdf-segment-actions button { min-width: 0; }
+.answer-sheet-card { z-index: 1; }
+.pdf-answer-sheet input,
+.answer-sheet-card textarea,
+.answer-sheet-card input { min-width: 0; max-width: 100%; }
+@media (max-width: 1280px) {
+  .pdf-panel .pdf-layout,
+  .pdf-focus-mode .pdf-layout { grid-template-columns: minmax(0, 1fr); }
+  .answer-sheet-card { position: static; max-height: none; overflow: visible; }
+  .answer-sheet-card { order: 2; }
+  .pdf-viewer-card { order: 1; }
+}
+@media (max-width: 920px) {
+  .pdf-segment-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pdf-segment-form label:first-child { grid-column: 1 / -1; }
+  .pdf-segment-form button[type="submit"],
+  .pdf-segment-form #pdfAutoSegmentBtn { grid-column: 1 / -1; width: 100%; }
+}
+@media (max-width: 560px) {
+  .pdf-viewer-card,
+  .answer-sheet-card,
+  .pdf-segment-builder { padding: 12px; border-radius: 18px; box-shadow: 4px 4px 0 var(--ink); }
+  .pdf-segment-form { grid-template-columns: 1fr; }
+  .pdf-segment-form label,
+  .pdf-segment-form button { grid-column: 1 / -1; }
+  .pdf-segment-card { display: grid; gap: 10px; }
+  .pdf-segment-actions { justify-content: stretch; }
+  .pdf-segment-actions button { width: 100%; }
+}
+
+
+/* v26: resilient large PDF import feedback */
+.pdf-import-notice { margin: 0; padding: 10px 12px; border: 1px solid var(--ink); border-radius: 14px; background: color-mix(in oklch, var(--gold), var(--paper) 55%); color: var(--ink); font-weight: 850; }
+
+
+/* v27: private built-in PDF bank */
+.built-in-pdf-library { margin: 0 0 14px; padding: clamp(14px, 2.4vw, 20px); border: 2px solid var(--ink); border-radius: 22px; background: linear-gradient(135deg, color-mix(in oklch, var(--gold), var(--paper) 42%), var(--paper)); box-shadow: 5px 5px 0 var(--ink); display: grid; gap: 12px; overflow: hidden; }
+.built-in-pdf-library > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.built-in-pdf-library strong { font-family: var(--body); font-weight: 950; letter-spacing: -.02em; }
+.built-in-pdf-library span { color: var(--muted); font-weight: 760; overflow-wrap: anywhere; }
+.built-in-pdf-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; min-width: 0; }
+.built-in-pdf-card { min-width: 0; display: grid; gap: 12px; padding: 13px; border: 1.5px solid var(--ink); border-radius: 18px; background: color-mix(in oklch, var(--paper), var(--cream) 28%); }
+.built-in-pdf-card.active { outline: 3px solid var(--red); background: color-mix(in oklch, var(--paper), var(--gold) 24%); }
+.built-in-pdf-card > div:first-child { min-width: 0; display: grid; gap: 4px; }
+.built-in-pdf-card small { color: var(--muted); font-weight: 720; line-height: 1.45; overflow-wrap: anywhere; }
+.built-in-pdf-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.built-in-pdf-actions button { min-width: 0; flex: 1 1 128px; white-space: normal; }
+@media (max-width: 560px) {
+  .built-in-pdf-library { border-radius: 18px; padding: 12px; box-shadow: 4px 4px 0 var(--ink); }
+  .built-in-pdf-list { grid-template-columns: 1fr; }
+  .built-in-pdf-actions button { flex-basis: 100%; }
+}
+
+
+/* v28: built-in Cambridge 4-19 bank + listening matching guidance */
+.test-import-card .muted { padding: 10px 12px; border: 1px dashed var(--ink); border-radius: 14px; background: color-mix(in oklch, var(--paper), var(--gold) 12%); font-weight: 760; line-height: 1.55; }
+.built-in-pdf-card strong { font-size: 1.02rem; }

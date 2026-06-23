@@ -55,6 +55,186 @@ const questionSets = {
   }
 };
 
+
+const builtInPdfBooks = [
+  {
+    "id": "cambridge-4",
+    "title": "剑桥雅思真题 4",
+    "fileName": "【4】剑桥雅思真题4.pdf",
+    "url": "./user-pdfs/【4】剑桥雅思真题4.pdf",
+    "book": 4,
+    "tag": "Cambridge IELTS 4",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-5",
+    "title": "剑桥雅思真题 5",
+    "fileName": "【5】剑桥雅思真题5.pdf",
+    "url": "./user-pdfs/【5】剑桥雅思真题5.pdf",
+    "book": 5,
+    "tag": "Cambridge IELTS 5",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-6",
+    "title": "剑桥雅思真题 6",
+    "fileName": "【6】剑桥雅思真题6.pdf",
+    "url": "./user-pdfs/【6】剑桥雅思真题6.pdf",
+    "book": 6,
+    "tag": "Cambridge IELTS 6",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-7",
+    "title": "剑桥雅思真题 7",
+    "fileName": "【7】剑桥雅思真题7.pdf",
+    "url": "./user-pdfs/【7】剑桥雅思真题7.pdf",
+    "book": 7,
+    "tag": "Cambridge IELTS 7",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-8",
+    "title": "剑桥雅思真题 8",
+    "fileName": "【8】剑桥雅思真题8.pdf",
+    "url": "./user-pdfs/【8】剑桥雅思真题8.pdf",
+    "book": 8,
+    "tag": "Cambridge IELTS 8",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-9",
+    "title": "剑桥雅思真题 9",
+    "fileName": "【9】剑桥雅思真题9.pdf",
+    "url": "./user-pdfs/【9】剑桥雅思真题9.pdf",
+    "book": 9,
+    "tag": "Cambridge IELTS 9",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-10",
+    "title": "剑桥雅思真题 10",
+    "fileName": "【10】剑桥雅思真题10.pdf",
+    "url": "./user-pdfs/【10】剑桥雅思真题10.pdf",
+    "book": 10,
+    "tag": "Cambridge IELTS 10",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-11",
+    "title": "剑桥雅思真题 11",
+    "fileName": "【11】剑桥雅思真题11.pdf",
+    "url": "./user-pdfs/【11】剑桥雅思真题11.pdf",
+    "book": 11,
+    "tag": "Cambridge IELTS 11",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-12",
+    "title": "剑桥雅思真题 12",
+    "fileName": "【12】剑桥雅思真题12.pdf",
+    "url": "./user-pdfs/【12】剑桥雅思真题12.pdf",
+    "book": 12,
+    "tag": "Cambridge IELTS 12",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-13",
+    "title": "剑桥雅思真题 13",
+    "fileName": "【13】剑桥雅思真题13.pdf",
+    "url": "./user-pdfs/【13】剑桥雅思真题13.pdf",
+    "book": 13,
+    "tag": "Cambridge IELTS 13",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-14",
+    "title": "剑桥雅思真题 14",
+    "fileName": "【14】剑桥雅思真题14.pdf",
+    "url": "./user-pdfs/【14】剑桥雅思真题14.pdf",
+    "book": 14,
+    "tag": "Cambridge IELTS 14",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-15",
+    "title": "剑桥雅思真题 15",
+    "fileName": "【15】剑桥雅思真题15.pdf",
+    "url": "./user-pdfs/【15】剑桥雅思真题15.pdf",
+    "book": 15,
+    "tag": "Cambridge IELTS 15",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-16",
+    "title": "剑桥雅思真题 16",
+    "fileName": "【16】剑桥雅思真题16.pdf",
+    "url": "./user-pdfs/【16】剑桥雅思真题16.pdf",
+    "book": 16,
+    "tag": "Cambridge IELTS 16",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-17",
+    "title": "剑桥雅思真题 17",
+    "fileName": "【17】剑桥雅思真题17.pdf",
+    "url": "./user-pdfs/【17】剑桥雅思真题17.pdf",
+    "book": 17,
+    "tag": "Cambridge IELTS 17",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-18",
+    "title": "剑桥雅思真题 18",
+    "fileName": "【18】剑桥雅思真题18.pdf",
+    "url": "./user-pdfs/【18】剑桥雅思真题18.pdf",
+    "book": 18,
+    "tag": "Cambridge IELTS 18",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  },
+  {
+    "id": "cambridge-19",
+    "title": "剑桥雅思真题 19",
+    "fileName": "【19】剑桥雅思真题19.pdf",
+    "url": "./user-pdfs/【19】剑桥雅思真题19.pdf",
+    "book": 19,
+    "tag": "Cambridge IELTS 19",
+    "note": "内置在私人真题本；可加载整本，也可自动切成 Test / Passage / Section 小套题。",
+    "questionCount": 40,
+    "autoSlice": false
+  }
+];
+
 const outputPrompts = [
   { type: 'Writing Task 2', prompt: 'Some people think students should focus on practical skills, while others believe academic subjects are more important. Discuss both views and give your opinion.', hint: '自查：观点是否明确？两方是否平衡？每段是否有解释和例子？' },
   { type: 'Writing Task 1', prompt: 'The chart shows changes in the number of international students in three countries from 2010 to 2020. Summarise the main features and make comparisons.', hint: '自查：概述句是否覆盖最大趋势？是否有关键数据比较？' },
@@ -94,7 +274,7 @@ const defaultState = {
   reminder: { enabled: false, time: '20:30', text: '该交今日雅思打卡了：刷题 + 错题 + 输出记录' },
   practice: { attempts: [], wrongbook: [], currentSet: 'reading', currentIndex: 0 },
   mock: { attempts: [], currentTestId: fullTests[0]?.id || '', answers: {}, startedAt: null, remaining: 0, audioNames: {}, audioUrls: {}, audioRates: {} },
-  vocab: coreWords.slice(0, 6).map(createWordCard), pdfDrill: { fileName: '', fileUrl: '', pdfData: null, page: 1, totalPages: 1, mode: 'reading', secondsLeft: 3600, running: false, answers: {}, segmentAnswers: {}, sessions: [], audioTracks: [], activeBundleId: '', activeSegmentId: '', segments: [], viewMode: 'pdf', pageTexts: {}, segmentTexts: {}, ocrTexts: {}, ocrProgress: '' },
+  vocab: coreWords.slice(0, 6).map(createWordCard), pdfDrill: { fileName: '', fileUrl: '', pdfData: null, pdfSourceUrl: '', builtInBookId: '', page: 1, totalPages: 1, mode: 'reading', secondsLeft: 3600, running: false, answers: {}, segmentAnswers: {}, sessions: [], audioTracks: [], activeBundleId: '', activeSegmentId: '', segments: [], viewMode: 'pdf', pageTexts: {}, segmentTexts: {}, ocrTexts: {}, ocrProgress: '', importNotice: '' },
   testBundles: [],
   outputs: [],
   aiFeedback: null,
@@ -114,7 +294,20 @@ init();
 async function init() { db = await openDB(); $('#dbStatus').textContent = 'IndexedDB 已连接'; const saved = await getState(); state = saved ? mergeState(saved) : structuredClone(defaultState); bindEvents(); render(); startReminderLoop(); }
 function openDB() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onupgradeneeded = e => { const database = e.target.result; if (!database.objectStoreNames.contains(STORE)) database.createObjectStore(STORE); }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
 function getState() { return new Promise(resolve => { const tx = db.transaction(STORE, 'readonly'); const request = tx.objectStore(STORE).get(STATE_KEY); request.onsuccess = () => resolve(request.result || null); request.onerror = () => resolve(null); }); }
-function saveState() { return new Promise(resolve => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).put(state, STATE_KEY); tx.oncomplete = () => resolve(); }); }
+function saveState() {
+  return new Promise(resolve => {
+    try {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(state, STATE_KEY);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => { console.warn('State save skipped:', tx.error); resolve(false); };
+      tx.onabort = () => { console.warn('State save aborted:', tx.error); resolve(false); };
+    } catch (error) {
+      console.warn('State save failed:', error);
+      resolve(false);
+    }
+  });
+}
 function mergeState(saved) { const merged = { ...structuredClone(defaultState), ...saved, target: { ...defaultState.target, ...(saved.target || {}) }, reminder: { ...defaultState.reminder, ...(saved.reminder || {}) }, review: { ...defaultState.review, ...(saved.review || {}) }, practice: { ...defaultState.practice, ...(saved.practice || {}) }, mock: { ...defaultState.mock, ...(saved.mock || {}) }, pdfDrill: { ...defaultState.pdfDrill, ...(saved.pdfDrill || {}) }, testBundles: saved.testBundles || [], vocab: saved.vocab?.length ? saved.vocab : defaultState.vocab, resources: saved.resources?.length ? saved.resources : highScoreResources, tasks: saved.tasks?.length ? saved.tasks : defaultState.tasks, checkins: saved.checkins?.length ? saved.checkins : defaultState.checkins, outputs: saved.outputs || [], aiFeedback: saved.aiFeedback || null, vocabModuleProgress: saved.vocabModuleProgress || {} }; mergeImportedContent(merged); return merged; }
 function mergeImportedContent(targetState) { const wordMap = new Map((targetState.vocab || []).map(item => [String(item.word || '').toLowerCase(), item])); importedPdfWords.forEach(item => { const key = String(item.word || '').toLowerCase(); if (key && !wordMap.has(key)) targetState.vocab.push(createWordCard(item)); }); const resourceMap = new Set((targetState.resources || []).map(item => item.url)); highScoreResources.forEach(item => { if (!resourceMap.has(item.url)) targetState.resources.push(item); }); }
 function bindEvents() {
@@ -151,6 +344,7 @@ function bindPdfDrillEvents() {
   $('#bulkBundleForm')?.addEventListener('submit', createBulkTestBundles);
   $('#folderBundleForm')?.addEventListener('submit', attachAudioFoldersToBundles);
   $('#testBundleList')?.addEventListener('click', handleTestBundleClick);
+  $('#builtInPdfList')?.addEventListener('click', handleBuiltInPdfClick);
   $('#pdfSegmentForm')?.addEventListener('submit', createPdfSegment);
   $('#pdfAutoSegmentBtn')?.addEventListener('click', autoCreatePdfSegments);
   $('#pdfSegmentList')?.addEventListener('click', handlePdfSegmentClick);
@@ -194,17 +388,22 @@ function renderPdfDrill() {
   renderPdfViewMode();
   renderPdfAudioTracks();
   renderTestBundles();
+  renderBuiltInPdfBooks();
   renderPdfSegments();
   buildPdfAnswerSheet(false);
 }
 async function handlePdfUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  if (file.type !== 'application/pdf') { alert('请上传 PDF 文件。'); return; }
+  if (!isPdfFile(file)) { alert('请上传 PDF 文件。'); return; }
   await loadPdfFileIntoState(file);
   await saveState();
   await ensurePdfDocument(true);
   renderPdfDrill();
+}
+function isPdfFile(file) {
+  const name = String(file?.name || '').toLowerCase();
+  return file?.type === 'application/pdf' || name.endsWith('.pdf');
 }
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -222,13 +421,24 @@ function dataUrlToUint8Array(dataUrl) {
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+async function pdfSourceToUint8Array() {
+  if (state.pdfDrill?.pdfData) return dataUrlToUint8Array(state.pdfDrill.pdfData);
+  const source = state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl;
+  if (!source) return null;
+  const response = await fetch(source, { cache: 'force-cache' });
+  if (!response.ok) throw new Error('内置 PDF 没有加载成功');
+  return new Uint8Array(await response.arrayBuffer());
+}
 async function loadPdfFileIntoState(file) {
   if (state.pdfDrill.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(state.pdfDrill.fileUrl);
   state.pdfDrill.fileName = file.name;
   state.pdfDrill.fileUrl = URL.createObjectURL(file);
+  state.pdfDrill.pdfSourceUrl = '';
+  state.pdfDrill.builtInBookId = '';
   state.pdfDrill.pdfData = await fileToDataUrl(file);
   state.pdfDrill.page = 1;
   state.pdfDrill.totalPages = 1;
+  state.pdfDrill.activeBundleId = '';
   state.pdfDrill.activeSegmentId = '';
   state.pdfDrill.segments = [];
   state.pdfDrill.segmentAnswers = {};
@@ -237,11 +447,17 @@ async function loadPdfFileIntoState(file) {
   state.pdfDrill.ocrTexts = {};
   state.pdfDrill.ocrProgress = '';
   state.pdfDrill.viewMode = 'pdf';
+  if (state.pdfDrill.pdfData && state.pdfDrill.pdfData.length > 45_000_000) {
+    state.pdfDrill.importNotice = '这个 PDF 比较大：可以正常刷题，但浏览器可能不会长期保存它；下次打开如丢失，请重新上传。';
+  } else {
+    state.pdfDrill.importNotice = '';
+  }
   pdfDoc = null;
 }
 async function ensurePdfDocument(force = false) {
   const empty = $('#pdfCanvasEmpty');
-  if (!state.pdfDrill?.pdfData || !window.pdfjsLib) {
+  const hasPdfSource = !!(state.pdfDrill?.pdfData || state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl);
+  if (!hasPdfSource || !window.pdfjsLib) {
     if (empty && state.pdfDrill?.fileName) empty.textContent = 'PDF 渲染器没有加载成功。请确认 pdf.min.js 和 pdf.worker.min.js 已一起上传到 GitHub。';
     return null;
   }
@@ -249,9 +465,9 @@ async function ensurePdfDocument(force = false) {
   if (window.pdfjsLib?.GlobalWorkerOptions) {
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
   }
-  const data = dataUrlToUint8Array(state.pdfDrill.pdfData);
-  if (!data) return null;
   try {
+    const data = await pdfSourceToUint8Array();
+    if (!data) return null;
     pdfDoc = await window.pdfjsLib.getDocument({ data }).promise;
     state.pdfDrill.totalPages = pdfDoc.numPages || 1;
     state.pdfDrill.page = Math.min(Math.max(1, state.pdfDrill.page || 1), state.pdfDrill.totalPages);
@@ -371,7 +587,7 @@ async function ocrPdfPage(pageNo) {
   return text;
 }
 async function ocrCurrentPdf(useSegment = false) {
-  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载扫描版 PDF。'); return; }
+  if (!state.pdfDrill?.fileName || !(state.pdfDrill?.pdfData || state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl)) { alert('先上传或加载扫描版 PDF。'); return; }
   const shell = $('#pdfTextShell');
   const segment = useSegment ? activePdfSegment() : null;
   const start = segment ? segment.startPage : (state.pdfDrill.page || 1);
@@ -550,7 +766,7 @@ function buildAutoSegments(totalPages, fileName = '') {
   return segments;
 }
 async function autoCreatePdfSegments() {
-  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载一整本 PDF，我才能自动切题。'); return; }
+  if (!state.pdfDrill?.fileName || !(state.pdfDrill?.pdfData || state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl)) { alert('先上传或加载一整本 PDF，我才能自动切题。'); return; }
   await ensurePdfDocument(false);
   const total = state.pdfDrill.totalPages || pdfDoc?.numPages || 1;
   const autoSegments = buildAutoSegments(total, state.pdfDrill.fileName);
@@ -580,7 +796,7 @@ function syncPdfSegmentInputs() {
 }
 async function createPdfSegment(event) {
   event.preventDefault();
-  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载一整本 PDF，再切成小套题。'); return; }
+  if (!state.pdfDrill?.fileName || !(state.pdfDrill?.pdfData || state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl)) { alert('先上传或加载一整本 PDF，再切成小套题。'); return; }
   await ensurePdfDocument(false);
   const total = state.pdfDrill.totalPages || pdfDoc?.numPages || 1;
   const title = ($('#pdfSegmentTitle')?.value || '').trim() || `刷题片段 ${(state.pdfDrill.segments || []).length + 1}`;
@@ -608,15 +824,16 @@ function renderPdfSegments() {
   const list = $('#pdfSegmentList');
   if (!list) return;
   const segments = state.pdfDrill?.segments || [];
+  const notice = state.pdfDrill?.importNotice ? `<p class="pdf-import-notice">${escapeHTML(state.pdfDrill.importNotice)}</p>` : '';
   if (!state.pdfDrill?.fileName) {
     list.innerHTML = '<p class="empty">先上传一整本 PDF，再把它切成 Test / Passage / Section。</p>';
     return;
   }
   if (!segments.length) {
-    list.innerHTML = '<p class="empty">还没有片段。建议按 Reading Passage 1-3 或 Listening Section 1-4 创建。</p>';
+    list.innerHTML = notice + '<p class="empty">还没有片段。建议按 Reading Passage 1-3 或 Listening Section 1-4 创建。</p>';
     return;
   }
-  list.innerHTML = segments.map(segment => `<article class="pdf-segment-card ${segment.id === state.pdfDrill.activeSegmentId ? 'active' : ''} ${segment.auto ? 'is-auto' : ''}"><div><strong>${escapeHTML(segment.title)}</strong><span>${segment.auto ? '自动切题 · ' : ''}第 ${segment.startPage}-${segment.endPage} 页 · ${segment.questionCount} 题</span></div><div class="pdf-segment-actions"><button type="button" data-pdf-segment-load="${segment.id}">开始刷</button><button class="ghost-btn" type="button" data-pdf-segment-delete="${segment.id}">删除</button></div></article>`).join('');
+  list.innerHTML = notice + segments.map(segment => `<article class="pdf-segment-card ${segment.id === state.pdfDrill.activeSegmentId ? 'active' : ''} ${segment.auto ? 'is-auto' : ''}"><div><strong>${escapeHTML(segment.title)}</strong><span>${segment.auto ? '自动切题 · ' : ''}第 ${segment.startPage}-${segment.endPage} 页 · ${segment.questionCount} 题</span></div><div class="pdf-segment-actions"><button type="button" data-pdf-segment-load="${segment.id}">开始刷</button><button class="ghost-btn" type="button" data-pdf-segment-delete="${segment.id}">删除</button></div></article>`).join('');
 }
 async function handlePdfSegmentClick(event) {
   const loadBtn = event.target.closest('[data-pdf-segment-load]');
@@ -715,7 +932,7 @@ async function createTestBundle(event) {
   event.preventDefault();
   const pdfFile = $('#testBundlePdf')?.files?.[0];
   const audioFiles = Array.from($('#testBundleAudio')?.files || []);
-  if (!pdfFile || pdfFile.type !== 'application/pdf') { alert('请先选择这套题的 PDF。'); return; }
+  if (!pdfFile || !isPdfFile(pdfFile)) { alert('请先选择这套题的 PDF。'); return; }
   const validAudio = audioFiles.filter(file => file.type.startsWith('audio/'));
   const title = $('#testBundleName').value.trim() || pdfFile.name.replace(/\.pdf$/i, '');
   const bundle = {
@@ -827,7 +1044,7 @@ async function createBundleFromFiles(pdfFile, tracks) {
 }
 async function createBulkTestBundles(event) {
   event.preventDefault();
-  const pdfFiles = Array.from($('#bulkBundlePdf')?.files || []).filter(file => file.type === 'application/pdf');
+  const pdfFiles = Array.from($('#bulkBundlePdf')?.files || []).filter(isPdfFile);
   const audioFiles = Array.from($('#bulkBundleAudio')?.files || []).filter(file => file.type.startsWith('audio/'));
   if (!pdfFiles.length) { alert('请先批量选择 PDF。'); return; }
   const audioGroups = filesToAudioGroups(audioFiles, false);
@@ -845,7 +1062,15 @@ async function attachAudioFoldersToBundles(event) {
   const files = Array.from($('#folderBundleAudio')?.files || []).filter(file => file.type.startsWith('audio/'));
   if (!files.length) { alert('请先选择音频总文件夹。'); return; }
   const audioGroups = filesToAudioGroups(files, true);
+  state.testBundles ||= [];
   let matched = 0;
+  const attachTracks = (bundle, tracks) => {
+    (bundle.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) URL.revokeObjectURL(track.url); });
+    bundle.audioTracks = tracks.slice().sort((a, b) => audioSortScore(a) - audioSortScore(b)).map(file => ({ id: crypto.randomUUID(), name: file.name, path: file.webkitRelativePath || file.name, url: URL.createObjectURL(file) }));
+    bundle.questionCount = bundle.questionCount || 40;
+    bundle.updatedAt = new Date().toLocaleString();
+    matched += 1;
+  };
   (state.testBundles || []).forEach(bundle => {
     const key = normalizeBundleKey(bundle.pdfName || bundle.title);
     let tracks = audioGroups.get(key) || [];
@@ -853,17 +1078,83 @@ async function attachAudioFoldersToBundles(event) {
       const book = extractBookNumber(bundle.pdfName || bundle.title);
       if (book) tracks = audioGroups.get(`book-${book}`) || [];
     }
-    if (tracks.length) {
-      (bundle.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) URL.revokeObjectURL(track.url); });
-      bundle.audioTracks = tracks.slice().sort((a, b) => audioSortScore(a) - audioSortScore(b)).map(file => ({ id: crypto.randomUUID(), name: file.name, path: file.webkitRelativePath || file.name, url: URL.createObjectURL(file) }));
-      matched += 1;
+    if (tracks.length) attachTracks(bundle, tracks);
+  });
+  (builtInPdfBooks || []).forEach(book => {
+    let tracks = audioGroups.get(normalizeBundleKey(book.fileName || book.title)) || [];
+    if (!tracks.length) tracks = audioGroups.get(`book-${book.book}`) || [];
+    if (!tracks.length) return;
+    let bundle = state.testBundles.find(item => item.builtInBookId === book.id);
+    if (!bundle) {
+      bundle = {
+        id: crypto.randomUUID(),
+        title: `${book.title}｜配套听力`,
+        pdfName: book.fileName,
+        pdfUrl: book.url,
+        pdfSourceUrl: book.url,
+        pdfData: null,
+        builtInBookId: book.id,
+        audioTracks: [],
+        createdAt: new Date().toLocaleString(),
+        lastPage: 1,
+        questionCount: book.questionCount || 40,
+        groupKey: normalizeBundleKey(book.fileName || book.title),
+      };
+      state.testBundles.unshift(bundle);
     }
+    attachTracks(bundle, tracks);
   });
   event.currentTarget.reset();
   await saveState();
   renderTestBundles();
   renderPdfDrill();
-  $('#bulkBundleStatus').textContent = `已从文件夹匹配 ${matched} 套题音频。`;
+  $('#bulkBundleStatus').textContent = matched ? `已匹配 ${matched} 套配套听力；在下方“套题卡片”点“开始这套”即可带音频刷题。` : '没有匹配到音频。请把音频文件夹命名成 剑4 / 剑桥5 / Cambridge 18 / C19 这类格式，或让音频文件名带对应数字。';
+}
+
+function renderBuiltInPdfBooks() {
+  const list = $('#builtInPdfList');
+  if (!list) return;
+  if (!builtInPdfBooks.length) {
+    list.innerHTML = '<p class="empty">还没有内置真题。把 PDF 放进 user-pdfs 文件夹后，这里会出现卡片。</p>';
+    return;
+  }
+  list.innerHTML = builtInPdfBooks.map(book => `<article class="built-in-pdf-card ${state.pdfDrill?.builtInBookId === book.id ? 'active' : ''}"><div><strong>${escapeHTML(book.title)}</strong><span>${escapeHTML(book.tag || book.fileName)}</span><small>${escapeHTML(book.note || '加载后可继续自动切题和 OCR。')}</small></div><div class="built-in-pdf-actions"><button type="button" data-load-built-in-pdf="${book.id}">加载整本</button><button type="button" class="ghost-btn" data-auto-built-in-pdf="${book.id}">像考试一样切题</button></div></article>`).join('');
+}
+async function handleBuiltInPdfClick(event) {
+  const auto = event.target.closest('[data-auto-built-in-pdf]');
+  const load = event.target.closest('[data-load-built-in-pdf]');
+  if (auto) { await loadBuiltInPdfBook(auto.dataset.autoBuiltInPdf, true); return; }
+  if (load) { await loadBuiltInPdfBook(load.dataset.loadBuiltInPdf, false); }
+}
+async function loadBuiltInPdfBook(bookId, autoSlice = false) {
+  const book = builtInPdfBooks.find(item => item.id === bookId);
+  if (!book) return;
+  if (state.pdfDrill.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(state.pdfDrill.fileUrl);
+  state.pdfDrill.builtInBookId = book.id;
+  state.pdfDrill.activeBundleId = '';
+  state.pdfDrill.fileName = book.title;
+  state.pdfDrill.fileUrl = book.url;
+  state.pdfDrill.pdfSourceUrl = book.url;
+  state.pdfDrill.pdfData = null;
+  state.pdfDrill.page = 1;
+  state.pdfDrill.totalPages = 1;
+  state.pdfDrill.activeSegmentId = '';
+  state.pdfDrill.segments = [];
+  state.pdfDrill.segmentAnswers = {};
+  state.pdfDrill.answers = {};
+  state.pdfDrill.pageTexts = {};
+  state.pdfDrill.segmentTexts = {};
+  state.pdfDrill.ocrTexts = {};
+  state.pdfDrill.ocrProgress = '';
+  state.pdfDrill.audioTracks = [];
+  state.pdfDrill.viewMode = 'pdf';
+  state.pdfDrill.importNotice = '已从私人真题本加载；PDF 不写入浏览器数据库，避免大文件保存失败。';
+  pdfDoc = null;
+  await ensurePdfDocument(true);
+  if ($('#pdfQuestionCount')) $('#pdfQuestionCount').value = book.questionCount || 40;
+  if (autoSlice || book.autoSlice) await autoCreatePdfSegments();
+  await saveState();
+  renderPdfDrill();
 }
 function renderTestBundles() {
   const list = $('#testBundleList'); if (!list) return;
@@ -883,6 +1174,8 @@ async function loadTestBundle(bundleId) {
   state.pdfDrill.fileName = bundle.pdfName;
   state.pdfDrill.fileUrl = bundle.pdfUrl;
   state.pdfDrill.pdfData = bundle.pdfData || null;
+  state.pdfDrill.pdfSourceUrl = bundle.pdfSourceUrl || '';
+  state.pdfDrill.builtInBookId = bundle.builtInBookId || '';
   state.pdfDrill.activeSegmentId = '';
   state.pdfDrill.segments = bundle.segments || [];
   state.pdfDrill.segmentAnswers = bundle.segmentAnswers || {};
@@ -905,7 +1198,7 @@ async function deleteTestBundle(bundleId) {
   if (bundle?.pdfUrl?.startsWith('blob:')) URL.revokeObjectURL(bundle.pdfUrl);
   (bundle?.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) URL.revokeObjectURL(track.url); });
   state.testBundles = (state.testBundles || []).filter(item => item.id !== bundleId);
-  if (state.pdfDrill.activeBundleId === bundleId) { state.pdfDrill.activeBundleId = ''; state.pdfDrill.fileName = ''; state.pdfDrill.fileUrl = ''; state.pdfDrill.pdfData = null; state.pdfDrill.audioTracks = []; state.pdfDrill.activeSegmentId = ''; state.pdfDrill.segments = []; state.pdfDrill.segmentAnswers = {}; pdfDoc = null; }
+  if (state.pdfDrill.activeBundleId === bundleId) { state.pdfDrill.activeBundleId = ''; state.pdfDrill.fileName = ''; state.pdfDrill.fileUrl = ''; state.pdfDrill.pdfSourceUrl = ''; state.pdfDrill.builtInBookId = ''; state.pdfDrill.pdfData = null; state.pdfDrill.audioTracks = []; state.pdfDrill.activeSegmentId = ''; state.pdfDrill.segments = []; state.pdfDrill.segmentAnswers = {}; pdfDoc = null; }
   await saveState();
   renderPdfDrill();
 }

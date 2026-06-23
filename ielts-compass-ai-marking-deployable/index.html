@@ -184,6 +184,11 @@
               <button id="pdfNextBtn" class="ghost-btn" type="button">下一页</button>
             </div>
             <div class="pdf-canvas-toolbar" aria-label="PDF 网页刷题工具栏">
+              <button id="pdfViewOriginalBtn" class="ghost-btn active" type="button">原版 PDF</button>
+              <button id="pdfViewTextBtn" class="ghost-btn" type="button">文字题面</button>
+              <button id="pdfExtractTextBtn" class="ghost-btn" type="button">提取当前文字</button>
+              <button id="pdfOcrCurrentBtn" class="ghost-btn" type="button">OCR 当前页</button>
+              <button id="pdfOcrSegmentBtn" class="ghost-btn" type="button">OCR 当前片段</button>
               <button id="pdfZoomOutBtn" class="ghost-btn" type="button">缩小</button>
               <button id="pdfFitBtn" class="ghost-btn" type="button">适合宽度</button>
               <button id="pdfZoomInBtn" class="ghost-btn" type="button">放大</button>
@@ -192,6 +197,25 @@
             <div id="pdfCanvasShell" class="pdf-canvas-shell">
               <canvas id="pdfCanvas" aria-label="PDF 网页刷题页面"></canvas>
               <p id="pdfCanvasEmpty" class="empty">上传 PDF 后，这里会变成网页刷题页面，不再显示浏览器 PDF 工具栏。</p>
+            </div>
+            <div id="pdfTextShell" class="pdf-text-shell hidden" aria-label="PDF 文字刷题页面">
+              <p class="empty">点击“提取当前文字”，把当前 PDF 或当前片段变成网页文字题面。</p>
+            </div>
+            <div class="pdf-segment-builder" aria-label="PDF 切片刷题">
+              <div>
+                <strong>切成小套题</strong>
+                <span>把整本 PDF 按 Test / Passage / Section 分开刷，翻页只在片段内。</span>
+              </div>
+              <form id="pdfSegmentForm" class="pdf-segment-form" autocomplete="off">
+                <label>片段名称<input id="pdfSegmentTitle" type="text" placeholder="例如：Test 1 Reading Passage 1" required></label>
+                <label>起始页<input id="pdfSegmentStart" type="number" min="1" value="1" required></label>
+                <label>结束页<input id="pdfSegmentEnd" type="number" min="1" value="3" required></label>
+                <label>题量<input id="pdfSegmentQuestions" type="number" min="1" max="80" value="13" required></label>
+                <button type="submit">创建片段</button>
+                <button id="pdfAutoSegmentBtn" class="ghost-btn" type="button">自动切题</button>
+              </form>
+              <p id="pdfAutoSegmentHint" class="pdf-auto-segment-hint">不想手动填页码时，点“自动切题”，系统会按剑桥雅思常见 Test 结构先生成可刷片段。</p>
+              <div id="pdfSegmentList" class="pdf-segment-list"></div>
             </div>
           </article>
           <article class="answer-sheet-card">
@@ -353,6 +377,7 @@
   <template id="wordTemplate"><article class="mini-word"><strong></strong><span></span><small></small></article></template>
 
   <script src="./pdf.min.js"></script>
+  <script src="./tesseract.min.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

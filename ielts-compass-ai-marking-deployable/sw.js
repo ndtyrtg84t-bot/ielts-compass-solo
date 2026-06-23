@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ielts-compass-pdf-local-v20';
+const CACHE_NAME = 'ielts-compass-auto-slice-v24';
 const ASSETS = [
   './',
   './index.html',
@@ -6,6 +6,11 @@ const ASSETS = [
   './app.js',
   './pdf.min.js',
   './pdf.worker.min.js',
+  './tesseract.min.js',
+  './tesseract-worker.min.js',
+  './tesseract-core-simd-lstm.wasm.js',
+  './tesseract-core-simd-lstm.wasm',
+  './eng.traineddata.gz',
   './vocab-data.js',
   './user-vocab-modules.js',
   './user-vocab-data.js',

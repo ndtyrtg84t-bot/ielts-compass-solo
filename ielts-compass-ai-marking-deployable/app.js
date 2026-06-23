@@ -94,7 +94,7 @@ const defaultState = {
   reminder: { enabled: false, time: '20:30', text: '该交今日雅思打卡了：刷题 + 错题 + 输出记录' },
   practice: { attempts: [], wrongbook: [], currentSet: 'reading', currentIndex: 0 },
   mock: { attempts: [], currentTestId: fullTests[0]?.id || '', answers: {}, startedAt: null, remaining: 0, audioNames: {}, audioUrls: {}, audioRates: {} },
-  vocab: coreWords.slice(0, 6).map(createWordCard), pdfDrill: { fileName: '', fileUrl: '', page: 1, totalPages: 1, mode: 'reading', secondsLeft: 3600, running: false, answers: {}, sessions: [], audioTracks: [], activeBundleId: '' },
+  vocab: coreWords.slice(0, 6).map(createWordCard), pdfDrill: { fileName: '', fileUrl: '', pdfData: null, page: 1, totalPages: 1, mode: 'reading', secondsLeft: 3600, running: false, answers: {}, segmentAnswers: {}, sessions: [], audioTracks: [], activeBundleId: '', activeSegmentId: '', segments: [], viewMode: 'pdf', pageTexts: {}, segmentTexts: {}, ocrTexts: {}, ocrProgress: '' },
   testBundles: [],
   outputs: [],
   aiFeedback: null,
@@ -151,12 +151,20 @@ function bindPdfDrillEvents() {
   $('#bulkBundleForm')?.addEventListener('submit', createBulkTestBundles);
   $('#folderBundleForm')?.addEventListener('submit', attachAudioFoldersToBundles);
   $('#testBundleList')?.addEventListener('click', handleTestBundleClick);
+  $('#pdfSegmentForm')?.addEventListener('submit', createPdfSegment);
+  $('#pdfAutoSegmentBtn')?.addEventListener('click', autoCreatePdfSegments);
+  $('#pdfSegmentList')?.addEventListener('click', handlePdfSegmentClick);
   $('#pdfPrevBtn')?.addEventListener('click', () => changePdfPage(-1));
   $('#pdfNextBtn')?.addEventListener('click', () => changePdfPage(1));
   $('#pdfZoomOutBtn')?.addEventListener('click', () => zoomPdf(-0.15));
   $('#pdfZoomInBtn')?.addEventListener('click', () => zoomPdf(0.15));
   $('#pdfFitBtn')?.addEventListener('click', fitPdfWidth);
   $('#pdfFocusBtn')?.addEventListener('click', togglePdfFocusMode);
+  $('#pdfViewOriginalBtn')?.addEventListener('click', () => setPdfViewMode('pdf'));
+  $('#pdfViewTextBtn')?.addEventListener('click', () => setPdfViewMode('text'));
+  $('#pdfExtractTextBtn')?.addEventListener('click', extractCurrentPdfText);
+  $('#pdfOcrCurrentBtn')?.addEventListener('click', () => ocrCurrentPdf(false));
+  $('#pdfOcrSegmentBtn')?.addEventListener('click', () => ocrCurrentPdf(true));
   $('#buildAnswerSheetBtn')?.addEventListener('click', buildPdfAnswerSheet);
   $('#gradePdfBtn')?.addEventListener('click', gradePdfAnswers);
   $('#savePdfSessionBtn')?.addEventListener('click', savePdfSession);
@@ -179,11 +187,14 @@ function setPdfMode(mode) {
 function renderPdfDrill() {
   if (!$('#pdfTimer')) return;
   const pdf = state.pdfDrill || defaultState.pdfDrill;
+  const segment = activePdfSegment();
   $('#pdfTimer').textContent = formatSeconds(pdf.secondsLeft || 0);
-  $('#pdfPageLabel').textContent = pdf.fileName ? `${pdf.fileName} · 第 ${pdf.page || 1}/${pdf.totalPages || '?'} 页` : '未上传 PDF';
-  renderPdfPage();
+  $('#pdfPageLabel').textContent = pdf.fileName ? (segment ? `${segment.title} · 第 ${pdf.page || segment.startPage}/${segment.endPage} 页` : `${pdf.fileName} · 第 ${pdf.page || 1}/${pdf.totalPages || '?'} 页`) : '未上传 PDF';
+  syncPdfSegmentInputs();
+  renderPdfViewMode();
   renderPdfAudioTracks();
   renderTestBundles();
+  renderPdfSegments();
   buildPdfAnswerSheet(false);
 }
 async function handlePdfUpload(event) {
@@ -218,6 +229,14 @@ async function loadPdfFileIntoState(file) {
   state.pdfDrill.pdfData = await fileToDataUrl(file);
   state.pdfDrill.page = 1;
   state.pdfDrill.totalPages = 1;
+  state.pdfDrill.activeSegmentId = '';
+  state.pdfDrill.segments = [];
+  state.pdfDrill.segmentAnswers = {};
+  state.pdfDrill.pageTexts = {};
+  state.pdfDrill.segmentTexts = {};
+  state.pdfDrill.ocrTexts = {};
+  state.pdfDrill.ocrProgress = '';
+  state.pdfDrill.viewMode = 'pdf';
   pdfDoc = null;
 }
 async function ensurePdfDocument(force = false) {
@@ -241,6 +260,168 @@ async function ensurePdfDocument(force = false) {
     if (empty) empty.textContent = '这个 PDF 暂时无法网页化渲染，可以重新上传或换浏览器试试。';
     return null;
   }
+}
+
+function renderPdfViewMode() {
+  const mode = state.pdfDrill?.viewMode === 'text' ? 'text' : 'pdf';
+  $('#pdfViewOriginalBtn')?.classList.toggle('active', mode === 'pdf');
+  $('#pdfViewTextBtn')?.classList.toggle('active', mode === 'text');
+  $('#pdfCanvasShell')?.classList.toggle('hidden', mode !== 'pdf');
+  $('#pdfTextShell')?.classList.toggle('hidden', mode !== 'text');
+  if (mode === 'text') renderPdfTextPage(); else renderPdfPage();
+}
+async function setPdfViewMode(mode) {
+  state.pdfDrill.viewMode = mode === 'text' ? 'text' : 'pdf';
+  await saveState();
+  renderPdfViewMode();
+}
+function textCacheKey(pageNo) {
+  const segment = activePdfSegment();
+  return segment ? `${segment.id}:${pageNo}` : String(pageNo);
+}
+function getCachedPdfText(pageNo) {
+  const key = textCacheKey(pageNo);
+  const segment = activePdfSegment();
+  return (state.pdfDrill.ocrTexts || {})[key] || (segment ? ((state.pdfDrill.segmentTexts || {})[key] || '') : ((state.pdfDrill.pageTexts || {})[key] || ''));
+}
+function setCachedPdfText(pageNo, text, source = 'text') {
+  const key = textCacheKey(pageNo);
+  const segment = activePdfSegment();
+  if (source === 'ocr') { state.pdfDrill.ocrTexts ||= {}; state.pdfDrill.ocrTexts[key] = text; return; }
+  if (segment) { state.pdfDrill.segmentTexts ||= {}; state.pdfDrill.segmentTexts[key] = text; }
+  else { state.pdfDrill.pageTexts ||= {}; state.pdfDrill.pageTexts[key] = text; }
+}
+function normalizePdfTextItems(items) {
+  const rows = [];
+  (items || []).forEach(item => {
+    const str = String(item.str || '').trim();
+    if (!str) return;
+    const y = Math.round((item.transform?.[5] || 0) / 3) * 3;
+    const x = item.transform?.[4] || 0;
+    let row = rows.find(entry => Math.abs(entry.y - y) <= 2);
+    if (!row) { row = { y, parts: [] }; rows.push(row); }
+    row.parts.push({ x, str });
+  });
+  return rows.sort((a, b) => b.y - a.y).map(row => row.parts.sort((a, b) => a.x - b.x).map(part => part.str).join(' ').replace(/\s+([,.;:?!])/g, '$1')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+async function extractPdfPageText(pageNo) {
+  const cached = getCachedPdfText(pageNo);
+  if (cached) return cached;
+  const doc = await ensurePdfDocument(false);
+  if (!doc) return '';
+  const page = await doc.getPage(pageNo);
+  const content = await page.getTextContent();
+  const text = normalizePdfTextItems(content.items);
+  if (text) { setCachedPdfText(pageNo, text); return text; }
+  return ocrPdfPage(pageNo);
+}
+
+let pdfOcrWorker = null;
+async function ensureOcrWorker() {
+  if (!window.Tesseract) throw new Error('OCR 引擎没有加载成功，请确认 tesseract.min.js 已上传。');
+  if (pdfOcrWorker) return pdfOcrWorker;
+  const status = $('#pdfOcrStatus');
+  pdfOcrWorker = await Tesseract.createWorker('eng', 1, {
+    workerPath: './tesseract-worker.min.js',
+    corePath: './tesseract-core-simd-lstm.wasm.js',
+    langPath: './',
+    gzip: true,
+    logger: message => {
+      const progress = message.progress ? ` ${Math.round(message.progress * 100)}%` : '';
+      state.pdfDrill.ocrProgress = `${message.status || 'OCR'}${progress}`;
+      if (status) status.textContent = state.pdfDrill.ocrProgress;
+    }
+  });
+  await pdfOcrWorker.setParameters({
+    tessedit_pageseg_mode: '6',
+    preserve_interword_spaces: '1'
+  });
+  return pdfOcrWorker;
+}
+async function renderPdfPageForOcr(pageNo) {
+  const doc = await ensurePdfDocument(false);
+  if (!doc) return null;
+  const page = await doc.getPage(pageNo);
+  const viewport = page.getViewport({ scale: 2.2 });
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d', { willReadFrequently: true });
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: context, viewport }).promise;
+  return canvas;
+}
+function cleanOcrText(text) {
+  return String(text || '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[|]{2,}/g, '')
+    .trim();
+}
+async function ocrPdfPage(pageNo) {
+  const cached = (state.pdfDrill.ocrTexts || {})[textCacheKey(pageNo)];
+  if (cached) return cached;
+  const worker = await ensureOcrWorker();
+  const canvas = await renderPdfPageForOcr(pageNo);
+  if (!canvas) return '';
+  const result = await worker.recognize(canvas);
+  const text = cleanOcrText(result?.data?.text || '');
+  setCachedPdfText(pageNo, text, 'ocr');
+  return text;
+}
+async function ocrCurrentPdf(useSegment = false) {
+  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载扫描版 PDF。'); return; }
+  const shell = $('#pdfTextShell');
+  const segment = useSegment ? activePdfSegment() : null;
+  const start = segment ? segment.startPage : (state.pdfDrill.page || 1);
+  const end = segment ? segment.endPage : (state.pdfDrill.page || 1);
+  state.pdfDrill.viewMode = 'text';
+  if (shell) shell.innerHTML = `<div class="pdf-ocr-working"><strong>正在 OCR 识别</strong><span id="pdfOcrStatus">准备识别第 ${start}-${end} 页……</span><small>扫描版 PDF 识别会慢一点，建议先切成 Passage / Section 再 OCR。</small></div>`;
+  try {
+    for (let pageNo = start; pageNo <= end; pageNo += 1) {
+      const status = $('#pdfOcrStatus');
+      if (status) status.textContent = `正在识别第 ${pageNo}/${end} 页……`;
+      await ocrPdfPage(pageNo);
+    }
+    const activeBundle = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
+    if (activeBundle) { activeBundle.ocrTexts = state.pdfDrill.ocrTexts || {}; activeBundle.viewMode = 'text'; }
+    await saveState();
+    renderPdfViewMode();
+  } catch (error) {
+    if (shell) shell.innerHTML = `<div class="pdf-text-empty"><strong>OCR 没有识别成功</strong><span>${escapeHTML(error.message || '可以先用原版 PDF 刷题，或只 OCR 当前页。')}</span></div>`;
+  }
+}
+async function extractCurrentPdfText() {
+  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载 PDF。'); return; }
+  const shell = $('#pdfTextShell');
+  const segment = activePdfSegment();
+  const start = segment ? segment.startPage : (state.pdfDrill.page || 1);
+  const end = segment ? segment.endPage : (state.pdfDrill.page || 1);
+  if (shell) shell.innerHTML = '<p class="empty">正在把 PDF 提取成网页文字题面……</p>';
+  for (let pageNo = start; pageNo <= end; pageNo += 1) await extractPdfPageText(pageNo);
+  state.pdfDrill.viewMode = 'text';
+  const activeBundle = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
+  if (activeBundle) { activeBundle.pageTexts = state.pdfDrill.pageTexts || {}; activeBundle.segmentTexts = state.pdfDrill.segmentTexts || {}; activeBundle.ocrTexts = state.pdfDrill.ocrTexts || {}; activeBundle.viewMode = 'text'; }
+  await saveState();
+  renderPdfViewMode();
+}
+function renderPdfTextPage() {
+  const shell = $('#pdfTextShell');
+  if (!shell) return;
+  const pageNo = state.pdfDrill.page || activePdfSegment()?.startPage || 1;
+  const text = getCachedPdfText(pageNo);
+  const segment = activePdfSegment();
+  if (!state.pdfDrill?.fileName) {
+    shell.innerHTML = '<p class="empty">先上传 PDF，再提取文字题面。</p>';
+    return;
+  }
+  if (!text) {
+    shell.innerHTML = `<div class="pdf-text-empty"><strong>这一页还没有文字题面</strong><span>${segment ? '点击“提取当前文字”，会把当前片段全部转成网页文字。' : '点击“提取当前文字”，会把当前页转成网页文字。'}</span><button type="button" onclick="extractCurrentPdfText()">提取当前文字</button></div>`;
+    return;
+  }
+  const paragraphs = text.split(/\n{2,}|\n/).map(line => line.trim()).filter(Boolean);
+  shell.innerHTML = `<article class="pdf-text-page"><div class="pdf-text-page-head"><span>${escapeHTML(segment?.title || state.pdfDrill.fileName || 'PDF')}</span><strong>Page ${pageNo}</strong></div>${paragraphs.map(line => `<p>${escapeHTML(line)}</p>`).join('')}</article>`;
 }
 async function renderPdfPage() {
   const canvas = $('#pdfCanvas');
@@ -271,7 +452,8 @@ async function renderPdfPage() {
   pdfRenderTask = page.render({ canvasContext: context, viewport });
   try { await pdfRenderTask.promise; } catch (_) {}
   pdfRenderTask = null;
-  $('#pdfPageLabel').textContent = `${state.pdfDrill.fileName} · 第 ${pageNo}/${doc.numPages} 页`;
+  const segment = activePdfSegment();
+  $('#pdfPageLabel').textContent = segment ? `${segment.title} · 第 ${pageNo}/${segment.endPage} 页` : `${state.pdfDrill.fileName} · 第 ${pageNo}/${doc.numPages} 页`;
 }
 
 function togglePdfFocusMode() {
@@ -302,21 +484,197 @@ function renderPdfAudioTracks() {
   box.classList.toggle('hidden', !tracks.length);
   box.innerHTML = tracks.map((track, index) => `<div class="pdf-audio-track"><strong>${escapeHTML(track.name || `Audio ${index + 1}`)}</strong><audio controls preload="metadata" src="${track.url}"></audio></div>`).join('');
 }
+
+function activePdfSegment() {
+  const pdf = state.pdfDrill || {};
+  return (pdf.segments || []).find(item => item.id === pdf.activeSegmentId) || null;
+}
+
+function detectCambridgeBookNumber(name) {
+  const match = String(name || '').match(/(?:剑桥雅思真题|剑桥雅思|剑|cambridge|c|【)\s*([4-9]|1\d|2\d)/i);
+  return match ? Number(match[1]) : null;
+}
+function inferContentStartPage(totalPages, fileName = '') {
+  const book = detectCambridgeBookNumber(fileName);
+  if (book && book <= 6) return Math.min(totalPages, 10);
+  if (book && book <= 12) return Math.min(totalPages, 12);
+  if (book) return Math.min(totalPages, 14);
+  return totalPages > 150 ? 12 : totalPages > 90 ? 8 : 1;
+}
+function segmentTitle(testNo, type, index = '') {
+  if (type === 'listening') return `Test ${testNo} Listening Section ${index}`;
+  if (type === 'reading') return `Test ${testNo} Reading Passage ${index}`;
+  if (type === 'writing') return `Test ${testNo} Writing`;
+  if (type === 'speaking') return `Test ${testNo} Speaking`;
+  return `Test ${testNo}`;
+}
+function buildAutoSegments(totalPages, fileName = '') {
+  const start = inferContentStartPage(totalPages, fileName);
+  const usable = Math.max(1, totalPages - start + 1);
+  const testCount = Math.max(1, Math.min(4, Math.floor(usable / 30) || 1));
+  const pagesPerTest = Math.max(24, Math.floor(usable / testCount));
+  const segments = [];
+  for (let t = 1; t <= testCount; t += 1) {
+    const testStart = start + (t - 1) * pagesPerTest;
+    const testEnd = t === testCount ? totalPages : Math.min(totalPages, testStart + pagesPerTest - 1);
+    const blocks = [
+      { type: 'listening', index: 1, offset: 0, len: 2, q: 10 },
+      { type: 'listening', index: 2, offset: 2, len: 2, q: 10 },
+      { type: 'listening', index: 3, offset: 4, len: 2, q: 10 },
+      { type: 'listening', index: 4, offset: 6, len: 2, q: 10 },
+      { type: 'reading', index: 1, offset: 8, len: 3, q: 13 },
+      { type: 'reading', index: 2, offset: 11, len: 3, q: 13 },
+      { type: 'reading', index: 3, offset: 14, len: 4, q: 14 },
+      { type: 'writing', index: '', offset: 18, len: 3, q: 2 },
+      { type: 'speaking', index: '', offset: 21, len: 3, q: 3 },
+    ];
+    blocks.forEach(block => {
+      const startPage = Math.min(totalPages, testStart + block.offset);
+      const endPage = Math.min(testEnd, startPage + block.len - 1);
+      if (startPage <= testEnd && endPage >= startPage) {
+        segments.push({
+          id: crypto.randomUUID(),
+          title: segmentTitle(t, block.type, block.index),
+          startPage,
+          endPage,
+          questionCount: block.q,
+          lastPage: startPage,
+          createdAt: new Date().toLocaleString(),
+          sourceName: state.pdfDrill.fileName,
+          auto: true,
+          type: block.type,
+        });
+      }
+    });
+  }
+  return segments;
+}
+async function autoCreatePdfSegments() {
+  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载一整本 PDF，我才能自动切题。'); return; }
+  await ensurePdfDocument(false);
+  const total = state.pdfDrill.totalPages || pdfDoc?.numPages || 1;
+  const autoSegments = buildAutoSegments(total, state.pdfDrill.fileName);
+  if (!autoSegments.length) { alert('这份 PDF 页数太少，暂时无法自动切题。'); return; }
+  const manualSegments = (state.pdfDrill.segments || []).filter(item => !item.auto);
+  state.pdfDrill.segments = [...autoSegments, ...manualSegments];
+  state.pdfDrill.activeSegmentId = autoSegments[0].id;
+  state.pdfDrill.page = autoSegments[0].startPage;
+  state.pdfDrill.segmentAnswers ||= {};
+  autoSegments.forEach(segment => { state.pdfDrill.segmentAnswers[segment.id] ||= {}; });
+  if ($('#pdfQuestionCount')) $('#pdfQuestionCount').value = autoSegments[0].questionCount || 40;
+  const activeBundle = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
+  if (activeBundle) { activeBundle.segments = state.pdfDrill.segments; activeBundle.segmentAnswers = state.pdfDrill.segmentAnswers; activeBundle.pageTexts = state.pdfDrill.pageTexts || {}; activeBundle.segmentTexts = state.pdfDrill.segmentTexts || {}; activeBundle.ocrTexts = state.pdfDrill.ocrTexts || {}; activeBundle.viewMode = state.pdfDrill.viewMode || 'pdf'; }
+  await saveState();
+  renderPdfDrill();
+  const hint = $('#pdfAutoSegmentHint');
+  if (hint) hint.textContent = `已自动生成 ${autoSegments.length} 个片段；如果页码不完全准，可以删除单个片段或手动补一个。`;
+}
+function syncPdfSegmentInputs() {
+  const total = state.pdfDrill?.totalPages || pdfDoc?.numPages || 1;
+  const start = $('#pdfSegmentStart');
+  const end = $('#pdfSegmentEnd');
+  if (start) start.max = total;
+  if (end) end.max = total;
+  if (start && (!start.value || Number(start.value) < 1)) start.value = state.pdfDrill?.page || 1;
+  if (end && (!end.value || Number(end.value) < 1)) end.value = Math.min(total, Math.max(Number(start?.value || 1), (state.pdfDrill?.page || 1) + 2));
+}
+async function createPdfSegment(event) {
+  event.preventDefault();
+  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载一整本 PDF，再切成小套题。'); return; }
+  await ensurePdfDocument(false);
+  const total = state.pdfDrill.totalPages || pdfDoc?.numPages || 1;
+  const title = ($('#pdfSegmentTitle')?.value || '').trim() || `刷题片段 ${(state.pdfDrill.segments || []).length + 1}`;
+  let startPage = Math.max(1, Math.min(total, Number($('#pdfSegmentStart')?.value || state.pdfDrill.page || 1)));
+  let endPage = Math.max(1, Math.min(total, Number($('#pdfSegmentEnd')?.value || startPage)));
+  if (endPage < startPage) [startPage, endPage] = [endPage, startPage];
+  const questionCount = Math.max(1, Math.min(80, Number($('#pdfSegmentQuestions')?.value || 13)));
+  const segment = { id: crypto.randomUUID(), title, startPage, endPage, questionCount, lastPage: startPage, createdAt: new Date().toLocaleString(), sourceName: state.pdfDrill.fileName };
+  state.pdfDrill.segments = [segment, ...(state.pdfDrill.segments || [])];
+  state.pdfDrill.activeSegmentId = segment.id;
+  state.pdfDrill.page = startPage;
+  state.pdfDrill.segmentAnswers ||= {};
+  state.pdfDrill.segmentAnswers[segment.id] = {};
+  const activeBundle = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
+  if (activeBundle) { activeBundle.segments = state.pdfDrill.segments; activeBundle.segmentAnswers = state.pdfDrill.segmentAnswers; activeBundle.pageTexts = state.pdfDrill.pageTexts || {}; activeBundle.segmentTexts = state.pdfDrill.segmentTexts || {}; activeBundle.ocrTexts = state.pdfDrill.ocrTexts || {}; activeBundle.viewMode = state.pdfDrill.viewMode || 'pdf'; }
+  if ($('#pdfQuestionCount')) $('#pdfQuestionCount').value = questionCount;
+  event.currentTarget.reset();
+  $('#pdfSegmentStart').value = startPage;
+  $('#pdfSegmentEnd').value = endPage;
+  $('#pdfSegmentQuestions').value = questionCount;
+  await saveState();
+  renderPdfDrill();
+}
+function renderPdfSegments() {
+  const list = $('#pdfSegmentList');
+  if (!list) return;
+  const segments = state.pdfDrill?.segments || [];
+  if (!state.pdfDrill?.fileName) {
+    list.innerHTML = '<p class="empty">先上传一整本 PDF，再把它切成 Test / Passage / Section。</p>';
+    return;
+  }
+  if (!segments.length) {
+    list.innerHTML = '<p class="empty">还没有片段。建议按 Reading Passage 1-3 或 Listening Section 1-4 创建。</p>';
+    return;
+  }
+  list.innerHTML = segments.map(segment => `<article class="pdf-segment-card ${segment.id === state.pdfDrill.activeSegmentId ? 'active' : ''} ${segment.auto ? 'is-auto' : ''}"><div><strong>${escapeHTML(segment.title)}</strong><span>${segment.auto ? '自动切题 · ' : ''}第 ${segment.startPage}-${segment.endPage} 页 · ${segment.questionCount} 题</span></div><div class="pdf-segment-actions"><button type="button" data-pdf-segment-load="${segment.id}">开始刷</button><button class="ghost-btn" type="button" data-pdf-segment-delete="${segment.id}">删除</button></div></article>`).join('');
+}
+async function handlePdfSegmentClick(event) {
+  const loadBtn = event.target.closest('[data-pdf-segment-load]');
+  const deleteBtn = event.target.closest('[data-pdf-segment-delete]');
+  if (loadBtn) { await loadPdfSegment(loadBtn.dataset.pdfSegmentLoad); return; }
+  if (deleteBtn) { await deletePdfSegment(deleteBtn.dataset.pdfSegmentDelete); }
+}
+async function loadPdfSegment(segmentId) {
+  const segment = (state.pdfDrill.segments || []).find(item => item.id === segmentId);
+  if (!segment) return;
+  state.pdfDrill.activeSegmentId = segment.id;
+  state.pdfDrill.page = Math.min(segment.endPage, Math.max(segment.startPage, segment.lastPage || segment.startPage));
+  state.pdfDrill.segmentAnswers ||= {};
+  state.pdfDrill.segmentAnswers[segment.id] ||= {};
+  if ($('#pdfQuestionCount')) $('#pdfQuestionCount').value = segment.questionCount || 40;
+  await saveState();
+  renderPdfDrill();
+}
+async function deletePdfSegment(segmentId) {
+  state.pdfDrill.segments = (state.pdfDrill.segments || []).filter(item => item.id !== segmentId);
+  if (state.pdfDrill.segmentAnswers) delete state.pdfDrill.segmentAnswers[segmentId];
+  if (state.pdfDrill.activeSegmentId === segmentId) state.pdfDrill.activeSegmentId = '';
+  const activeBundle = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
+  if (activeBundle) { activeBundle.segments = state.pdfDrill.segments; activeBundle.segmentAnswers = state.pdfDrill.segmentAnswers || {}; }
+  await saveState();
+  renderPdfDrill();
+}
 async function changePdfPage(delta) {
-  const max = state.pdfDrill.totalPages || pdfDoc?.numPages || 9999;
-  state.pdfDrill.page = Math.min(max, Math.max(1, (state.pdfDrill.page || 1) + delta));
+  const segment = activePdfSegment();
+  const min = segment ? segment.startPage : 1;
+  const max = segment ? segment.endPage : (state.pdfDrill.totalPages || pdfDoc?.numPages || 9999);
+  state.pdfDrill.page = Math.min(max, Math.max(min, (state.pdfDrill.page || min) + delta));
   const active = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
   if (active) active.lastPage = state.pdfDrill.page;
+  if (segment) segment.lastPage = state.pdfDrill.page;
   await saveState();
   renderPdfDrill();
 }
 function buildPdfAnswerSheet(reset = true) {
   const box = $('#pdfAnswerSheet');
   if (!box) return;
-  const count = Math.max(1, Math.min(80, Number($('#pdfQuestionCount')?.value || 40)));
-  if (reset) state.pdfDrill.answers = {};
-  box.innerHTML = Array.from({ length: count }, (_, i) => { const n = i + 1; const val = state.pdfDrill.answers?.[n] || ''; return `<label><span>${n}</span><input data-pdf-answer="${n}" value="${escapeHTML(val)}" placeholder="答案"></label>`; }).join('');
-  box.querySelectorAll('[data-pdf-answer]').forEach(input => input.addEventListener('input', async () => { state.pdfDrill.answers[input.dataset.pdfAnswer] = input.value.trim(); await saveState(); }));
+  const segment = activePdfSegment();
+  const questionInput = $('#pdfQuestionCount');
+  if (segment && questionInput && Number(questionInput.value || 0) !== Number(segment.questionCount || 40)) questionInput.value = segment.questionCount || 40;
+  const count = Math.max(1, Math.min(80, Number(questionInput?.value || segment?.questionCount || 40)));
+  const answerBucket = segment ? (state.pdfDrill.segmentAnswers ||= {})[segment.id] ||= {} : (state.pdfDrill.answers ||= {});
+  if (reset) {
+    if (segment) state.pdfDrill.segmentAnswers[segment.id] = {};
+    else state.pdfDrill.answers = {};
+  }
+  const values = segment ? (state.pdfDrill.segmentAnswers[segment.id] || {}) : (state.pdfDrill.answers || {});
+  box.innerHTML = Array.from({ length: count }, (_, i) => { const n = i + 1; const val = values?.[n] || ''; return `<label><span>${n}</span><input data-pdf-answer="${n}" value="${escapeHTML(val)}" placeholder="答案"></label>`; }).join('');
+  box.querySelectorAll('[data-pdf-answer]').forEach(input => input.addEventListener('input', async () => {
+    const currentSegment = activePdfSegment();
+    if (currentSegment) { (state.pdfDrill.segmentAnswers ||= {})[currentSegment.id] ||= {}; state.pdfDrill.segmentAnswers[currentSegment.id][input.dataset.pdfAnswer] = input.value.trim(); }
+    else { (state.pdfDrill.answers ||= {})[input.dataset.pdfAnswer] = input.value.trim(); }
+    await saveState();
+  }));
 }
 function parseAnswerKey(text) {
   const raw = String(text || '').trim();
@@ -333,18 +691,22 @@ async function gradePdfAnswers() {
   const key = parseAnswerKey($('#answerKeyInput').value);
   const nums = Object.keys(key);
   if (!nums.length) { $('#pdfResult').innerHTML = '<p class="empty">请先输入答案 Key，才能自动判分。</p>'; return; }
+  const segment = activePdfSegment();
+  const answers = segment ? ((state.pdfDrill.segmentAnswers || {})[segment.id] || {}) : (state.pdfDrill.answers || {});
   let correct = 0;
   const details = nums.map(n => {
-    const user = (state.pdfDrill.answers?.[n] || '').trim().toLowerCase();
+    const user = (answers?.[n] || '').trim().toLowerCase();
     const ok = user && user === key[n];
     if (ok) correct += 1;
     return `<li class="${ok ? 'ok' : 'bad'}">第 ${n} 题：你的答案 ${escapeHTML(user || '未填')}；正确答案 ${escapeHTML(key[n])}</li>`;
   }).join('');
   const score = Math.round(correct / nums.length * 100);
-  $('#pdfResult').innerHTML = `<h3>PDF 刷题判分：${correct}/${nums.length} · ${score}%</h3><ol>${details}</ol>`;
+  $('#pdfResult').innerHTML = `<h3>${segment ? escapeHTML(segment.title) : 'PDF 刷题'}判分：${correct}/${nums.length} · ${score}%</h3><ol>${details}</ol>`;
 }
 async function savePdfSession() {
-  state.pdfDrill.sessions.unshift({ id: crypto.randomUUID(), fileName: state.pdfDrill.fileName || '未命名 PDF', bundleId: state.pdfDrill.activeBundleId || '', date: new Date().toLocaleString(), answers: { ...(state.pdfDrill.answers || {}) } });
+  const segment = activePdfSegment();
+  const answers = segment ? ((state.pdfDrill.segmentAnswers || {})[segment.id] || {}) : (state.pdfDrill.answers || {});
+  state.pdfDrill.sessions.unshift({ id: crypto.randomUUID(), fileName: state.pdfDrill.fileName || '未命名 PDF', bundleId: state.pdfDrill.activeBundleId || '', segmentId: segment?.id || '', segmentTitle: segment?.title || '', date: new Date().toLocaleString(), answers: { ...answers } });
   await saveState();
   $('#pdfResult').innerHTML = '<p class="empty">本次 PDF 刷题记录已保存。</p>';
 }
@@ -521,6 +883,13 @@ async function loadTestBundle(bundleId) {
   state.pdfDrill.fileName = bundle.pdfName;
   state.pdfDrill.fileUrl = bundle.pdfUrl;
   state.pdfDrill.pdfData = bundle.pdfData || null;
+  state.pdfDrill.activeSegmentId = '';
+  state.pdfDrill.segments = bundle.segments || [];
+  state.pdfDrill.segmentAnswers = bundle.segmentAnswers || {};
+  state.pdfDrill.pageTexts = bundle.pageTexts || {};
+  state.pdfDrill.segmentTexts = bundle.segmentTexts || {};
+  state.pdfDrill.ocrTexts = bundle.ocrTexts || {};
+  state.pdfDrill.viewMode = bundle.viewMode || 'pdf';
   state.pdfDrill.page = bundle.lastPage || 1;
   pdfDoc = null;
   await ensurePdfDocument(true);
@@ -536,7 +905,7 @@ async function deleteTestBundle(bundleId) {
   if (bundle?.pdfUrl?.startsWith('blob:')) URL.revokeObjectURL(bundle.pdfUrl);
   (bundle?.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) URL.revokeObjectURL(track.url); });
   state.testBundles = (state.testBundles || []).filter(item => item.id !== bundleId);
-  if (state.pdfDrill.activeBundleId === bundleId) { state.pdfDrill.activeBundleId = ''; state.pdfDrill.fileName = ''; state.pdfDrill.fileUrl = ''; state.pdfDrill.pdfData = null; state.pdfDrill.audioTracks = []; pdfDoc = null; }
+  if (state.pdfDrill.activeBundleId === bundleId) { state.pdfDrill.activeBundleId = ''; state.pdfDrill.fileName = ''; state.pdfDrill.fileUrl = ''; state.pdfDrill.pdfData = null; state.pdfDrill.audioTracks = []; state.pdfDrill.activeSegmentId = ''; state.pdfDrill.segments = []; state.pdfDrill.segmentAnswers = {}; pdfDoc = null; }
   await saveState();
   renderPdfDrill();
 }

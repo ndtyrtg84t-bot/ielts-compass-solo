@@ -569,3 +569,53 @@ body { font-size: clamp(16px, .95vw, 18px); }
 .pdf-focus-mode .pdf-viewer-card, .pdf-focus-mode .answer-sheet-card { box-shadow: 4px 4px 0 var(--ink); }
 @media (max-width: 1040px) { .answer-sheet-card { position: static; max-height: none; } }
 @media (max-width: 680px) { .pdf-panel .pdf-layout, .pdf-focus-mode .pdf-layout { grid-template-columns: 1fr; } .answer-sheet-card { order: 2; } .pdf-viewer-card { order: 1; } }
+
+
+/* v21: split one full PDF into IELTS-style Test / Passage / Section drills */
+.pdf-segment-builder { margin-top: 14px; padding: 14px; border: 1px dashed var(--ink); border-radius: 18px; background: color-mix(in oklch, var(--paper), var(--gold) 12%); display: grid; gap: 12px; }
+.pdf-segment-builder > div:first-child { display: grid; gap: 3px; }
+.pdf-segment-builder strong { font-family: var(--body); font-weight: 950; letter-spacing: -.02em; }
+.pdf-segment-builder span { color: var(--muted); font-weight: 750; }
+.pdf-segment-form { display: grid; grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(82px, 110px)) auto; gap: 10px; align-items: end; }
+.pdf-segment-list { display: grid; gap: 8px; }
+.pdf-segment-card { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 11px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
+.pdf-segment-card.active { outline: 2px solid var(--red); background: color-mix(in oklch, var(--paper), var(--gold) 20%); }
+.pdf-segment-card div:first-child { min-width: 0; display: grid; gap: 3px; }
+.pdf-segment-card strong { font-family: var(--body); font-size: 1rem; font-weight: 900; letter-spacing: -.01em; }
+.pdf-segment-card span { color: var(--muted); font-weight: 750; font-size: .9rem; }
+.pdf-segment-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: end; }
+.pdf-focus-mode .pdf-segment-builder { margin-top: 10px; }
+@media (max-width: 920px) { .pdf-segment-form { grid-template-columns: 1fr 1fr; } .pdf-segment-form button { grid-column: 1 / -1; } .pdf-segment-card { display: grid; } .pdf-segment-actions { justify-content: start; } }
+@media (max-width: 560px) { .pdf-segment-form { grid-template-columns: 1fr; } }
+
+
+/* v22: turn uploaded PDF pages into website-style text drills */
+.pdf-canvas-toolbar .active { background: var(--ink); color: var(--cream); }
+.pdf-text-shell { min-height: 680px; max-height: 78vh; overflow: auto; padding: clamp(18px, 3vw, 34px); border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg, var(--paper), color-mix(in oklch, var(--cream), var(--paper) 52%)); }
+.pdf-text-page { max-width: 76ch; margin: 0 auto; color: var(--ink); }
+.pdf-text-page-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--ink); }
+.pdf-text-page-head span { color: var(--muted); font-weight: 850; }
+.pdf-text-page-head strong { font-family: var(--body); font-size: clamp(1.2rem, 2vw, 1.8rem); font-weight: 950; }
+.pdf-text-page p { margin: 0 0 1em; font-size: clamp(1.02rem, 1.4vw, 1.18rem); line-height: 1.78; letter-spacing: .005em; }
+.pdf-text-page p:first-of-type { font-weight: 850; }
+.pdf-text-empty { min-height: 420px; display: grid; place-content: center; gap: 10px; text-align: center; }
+.pdf-text-empty strong { font-size: clamp(1.3rem, 2.5vw, 2rem); font-weight: 950; }
+.pdf-text-empty span { color: var(--muted); font-weight: 750; }
+.pdf-text-empty button { justify-self: center; margin-top: 8px; }
+@media (max-width: 1040px) { .pdf-text-shell { min-height: 520px; max-height: 70vh; } }
+@media (max-width: 680px) { .pdf-text-shell { padding: 16px; min-height: 460px; } .pdf-text-page-head { display: grid; } }
+
+
+/* v23: browser OCR for scanned IELTS PDFs */
+.pdf-ocr-working { min-height: 420px; display: grid; place-content: center; gap: 10px; text-align: center; }
+.pdf-ocr-working strong { font-size: clamp(1.45rem, 3vw, 2.3rem); font-weight: 950; letter-spacing: -.03em; }
+.pdf-ocr-working span { display: inline-grid; place-items: center; min-height: 42px; padding: 10px 14px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--gold); color: var(--ink); font-weight: 900; }
+.pdf-ocr-working small { color: var(--muted); font-weight: 750; max-width: 44ch; }
+
+
+/* v24: automatically slice full Cambridge PDFs into drill cards */
+.pdf-segment-form #pdfAutoSegmentBtn { background: var(--ink); color: var(--cream); }
+.pdf-auto-segment-hint { margin: -4px 0 0; color: var(--muted); font-size: .92rem; font-weight: 750; }
+.pdf-segment-card.is-auto { border-style: dashed; background: color-mix(in oklch, var(--paper), var(--gold) 12%); }
+.pdf-segment-card.is-auto strong::after { content: ' AUTO'; display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 999px; background: var(--ink); color: var(--cream); font-size: .68rem; letter-spacing: .04em; vertical-align: middle; }
+@media (max-width: 920px) { .pdf-segment-form #pdfAutoSegmentBtn { grid-column: 1 / -1; } }

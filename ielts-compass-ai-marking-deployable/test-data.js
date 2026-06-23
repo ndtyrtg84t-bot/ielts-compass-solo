@@ -74,6 +74,83 @@ const IELTS_FULL_TESTS = [
       ]
     }
   }
+,
+  {
+    id: 'mock-d',
+    title: 'Academic Mock D · Transport and Housing',
+    minutes: 38,
+    listening: {
+      title: 'Listening Section · Apartment Viewing',
+      script: 'Audio script: A tenant calls a property manager about a small apartment near the train station. The manager explains that the rent includes water but not electricity. The apartment is available from the first of next month. The tenant asks about noise, and the manager says the bedroom faces a quiet courtyard. A viewing is arranged for Thursday at half past four.',
+      questions: [
+        { id: 'd-l1', text: 'What is included in the rent?', options: ['Electricity', 'Water', 'Internet', 'Gas'], answer: 1, explanation: 'The manager says water is included but electricity is not.' },
+        { id: 'd-l2', text: 'When is the apartment available?', options: ['Immediately', 'Next week', 'The first of next month', 'In three months'], answer: 2, explanation: 'The availability date is the first of next month.' },
+        { id: 'd-l3', text: 'Why might the apartment be quieter than expected?', options: ['It is underground', 'It has no windows', 'The bedroom faces a courtyard', 'It is far from transport'], answer: 2, explanation: 'The bedroom faces a quiet courtyard.' },
+        { id: 'd-l4', text: 'When is the viewing?', options: ['Tuesday at 4:30', 'Thursday at 4:30', 'Thursday at 5:30', 'Friday at 4:00'], answer: 1, explanation: 'A viewing is arranged for Thursday at half past four.' }
+      ]
+    },
+    reading: {
+      title: 'Reading Passage · Car-Free Neighbourhoods',
+      passage: 'Several cities are experimenting with car-free neighbourhoods to reduce pollution and improve public space. Critics worry that restrictions may inconvenience residents, especially those with limited mobility. However, pilot projects suggest that when reliable buses, safe cycling lanes and shared delivery points are provided, many residents adapt quickly. Local shops can also benefit from slower streets because pedestrians spend more time in the area. The main lesson is that car-free design works best when it is introduced with practical alternatives rather than as a simple ban.',
+      questions: [
+        { id: 'd-r1', text: 'What is the main purpose of car-free neighbourhoods?', options: ['To increase parking fees', 'To reduce pollution and improve public space', 'To close local shops', 'To remove all buses'], answer: 1, explanation: 'The passage states the goal is reducing pollution and improving public space.' },
+        { id: 'd-r2', text: 'What concern do critics raise?', options: ['Residents may be inconvenienced', 'Shops may become too busy', 'Cycling lanes are too safe', 'Buses are too reliable'], answer: 0, explanation: 'Critics worry about inconvenience, especially for people with limited mobility.' },
+        { id: 'd-r3', text: 'Why can local shops benefit?', options: ['Cars move faster', 'Pedestrians spend more time there', 'Delivery points disappear', 'Rent becomes free'], answer: 1, explanation: 'Pedestrians staying longer can help shops.' },
+        { id: 'd-r4', text: 'What condition supports successful car-free design?', options: ['A simple ban only', 'No public transport', 'Practical alternatives', 'More private parking'], answer: 2, explanation: 'The final sentence stresses practical alternatives.' }
+      ]
+    }
+  },
+  {
+    id: 'mock-e',
+    title: 'Academic Mock E · Food and Sustainability',
+    minutes: 38,
+    listening: {
+      title: 'Listening Section · Community Cooking Course',
+      script: 'Audio script: A community centre is offering a four-week cooking course about reducing food waste. The tutor will show participants how to plan meals, store vegetables properly and use leftovers safely. The course costs twenty pounds, but students and retired residents can pay half price. Participants should bring a notebook, while knives and ingredients are provided.',
+      questions: [
+        { id: 'e-l1', text: 'How long is the course?', options: ['Two weeks', 'Four weeks', 'Six weeks', 'One weekend'], answer: 1, explanation: 'It is a four-week cooking course.' },
+        { id: 'e-l2', text: 'What is the course mainly about?', options: ['Restaurant management', 'Reducing food waste', 'Baking cakes', 'Growing vegetables'], answer: 1, explanation: 'The main topic is reducing food waste.' },
+        { id: 'e-l3', text: 'Who can pay half price?', options: ['Tourists', 'Students and retired residents', 'Only children', 'Professional chefs'], answer: 1, explanation: 'Students and retired residents get a discount.' },
+        { id: 'e-l4', text: 'What should participants bring?', options: ['A knife', 'Ingredients', 'A notebook', 'A cooking pot'], answer: 2, explanation: 'Participants should bring a notebook.' }
+      ]
+    },
+    reading: {
+      title: 'Reading Passage · Vertical Farming',
+      passage: 'Vertical farming grows crops in stacked layers under controlled light and temperature. Supporters argue that it uses less land and can place food production closer to urban consumers. The method also reduces the need for pesticides because the growing environment is enclosed. Nevertheless, energy use remains a challenge, particularly when farms rely on artificial lighting. Researchers are therefore testing renewable power and more efficient LED systems. Vertical farming is unlikely to replace traditional agriculture, but it may become an important supplement for leafy vegetables and herbs.',
+      questions: [
+        { id: 'e-r1', text: 'What is vertical farming?', options: ['Growing crops in stacked layers', 'Farming only on mountains', 'Fishing in cities', 'Traditional field agriculture'], answer: 0, explanation: 'The first sentence defines it as growing crops in stacked layers.' },
+        { id: 'e-r2', text: 'Why may fewer pesticides be needed?', options: ['The farms are enclosed', 'The crops are not edible', 'The soil is removed from cities', 'The plants grow outside'], answer: 0, explanation: 'An enclosed environment reduces pest exposure.' },
+        { id: 'e-r3', text: 'What challenge remains?', options: ['Too much land use', 'Energy use', 'No urban consumers', 'Too many herbs'], answer: 1, explanation: 'The passage identifies energy use as a challenge.' },
+        { id: 'e-r4', text: 'What is the likely future role of vertical farming?', options: ['Replacing all agriculture', 'Supplementing some crops', 'Ending LED research', 'Increasing pesticide use'], answer: 1, explanation: 'It may supplement leafy vegetables and herbs.' }
+      ]
+    }
+  },
+  {
+    id: 'mock-f',
+    title: 'Academic Mock F · Media and Culture',
+    minutes: 38,
+    listening: {
+      title: 'Listening Section · Local Film Festival',
+      script: 'Audio script: The local film festival will open on Friday evening with a documentary about coastal towns. Most screenings take place at the central library, but children’s films will be shown at the arts centre. Tickets are cheaper before five o’clock. Volunteers are needed to check tickets and guide visitors between rooms.',
+      questions: [
+        { id: 'f-l1', text: 'What film opens the festival?', options: ['A comedy', 'A documentary about coastal towns', 'A children’s cartoon', 'A historical drama'], answer: 1, explanation: 'The festival opens with a documentary about coastal towns.' },
+        { id: 'f-l2', text: 'Where are most screenings held?', options: ['Central library', 'Arts centre', 'Town hall', 'University theatre'], answer: 0, explanation: 'Most screenings take place at the central library.' },
+        { id: 'f-l3', text: 'When are tickets cheaper?', options: ['After eight', 'Before five', 'Only on Sunday', 'At midnight'], answer: 1, explanation: 'Tickets are cheaper before five o’clock.' },
+        { id: 'f-l4', text: 'What will volunteers do?', options: ['Write reviews', 'Check tickets and guide visitors', 'Make films', 'Cook meals'], answer: 1, explanation: 'Volunteers check tickets and guide visitors.' }
+      ]
+    },
+    reading: {
+      title: 'Reading Passage · Museum Labels',
+      passage: 'Museum labels may seem minor, but they strongly influence how visitors understand objects. A short label can make an unfamiliar artefact approachable, while a technical label may discourage non-specialists. Some museums now use layered labels: a brief explanation for casual visitors followed by optional deeper information. This approach respects different levels of interest without oversimplifying the collection. Digital labels can also provide audio, translations and images of how objects were used.',
+      questions: [
+        { id: 'f-r1', text: 'What do museum labels influence?', options: ['Ticket prices', 'Visitor understanding', 'Building size', 'Opening hours'], answer: 1, explanation: 'Labels influence how visitors understand objects.' },
+        { id: 'f-r2', text: 'What may discourage non-specialists?', options: ['A technical label', 'A short label', 'A clear translation', 'An audio guide'], answer: 0, explanation: 'Technical labels may discourage non-specialists.' },
+        { id: 'f-r3', text: 'What are layered labels designed to do?', options: ['Remove all detail', 'Serve different interest levels', 'Hide the collection', 'Replace museums'], answer: 1, explanation: 'They provide brief and deeper information for different visitors.' },
+        { id: 'f-r4', text: 'What can digital labels provide?', options: ['Only prices', 'Audio, translations and images', 'Parking spaces', 'Food orders'], answer: 1, explanation: 'Digital labels can provide audio, translations and images.' }
+      ]
+    }
+  }
+
 ];
 
 if (typeof window !== 'undefined') {

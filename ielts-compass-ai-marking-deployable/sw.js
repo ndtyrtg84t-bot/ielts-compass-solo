@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ielts-compass-single-view-v8';
+const CACHE_NAME = 'ielts-compass-clean-type-v9';
 const ASSETS = [
   './',
   './index.html',

@@ -1,0 +1,8 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/mark-output"
+  to = "/.netlify/functions/mark-output"
+  status = 200

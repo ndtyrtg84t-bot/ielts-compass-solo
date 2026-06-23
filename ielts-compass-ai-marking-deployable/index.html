@@ -178,9 +178,20 @@
         <div id="pdfAudioBox" class="pdf-audio-box hidden"></div>
         <div class="pdf-layout">
           <article class="pdf-viewer-card">
-            <div class="pdf-page-bar"><button id="pdfPrevBtn" class="ghost-btn" type="button">上一页</button><span id="pdfPageLabel">未上传 PDF</span><button id="pdfNextBtn" class="ghost-btn" type="button">下一页</button></div>
-            <iframe id="pdfFrame" title="PDF 预览"></iframe>
-            <p class="muted">如果浏览器 PDF 预览不支持指定页跳转，可以用下方页码记录当前进度。</p>
+            <div class="pdf-page-bar">
+              <button id="pdfPrevBtn" class="ghost-btn" type="button">上一页</button>
+              <span id="pdfPageLabel">未上传 PDF</span>
+              <button id="pdfNextBtn" class="ghost-btn" type="button">下一页</button>
+            </div>
+            <div class="pdf-canvas-toolbar" aria-label="PDF 网页刷题工具栏">
+              <button id="pdfZoomOutBtn" class="ghost-btn" type="button">缩小</button>
+              <button id="pdfFitBtn" class="ghost-btn" type="button">适合宽度</button>
+              <button id="pdfZoomInBtn" class="ghost-btn" type="button">放大</button>
+            </div>
+            <div id="pdfCanvasShell" class="pdf-canvas-shell">
+              <canvas id="pdfCanvas" aria-label="PDF 网页刷题页面"></canvas>
+              <p id="pdfCanvasEmpty" class="empty">上传 PDF 后，这里会变成网页刷题页面，不再显示浏览器 PDF 工具栏。</p>
+            </div>
           </article>
           <article class="answer-sheet-card">
             <h3>答题卡</h3>
@@ -340,6 +351,7 @@
 
   <template id="wordTemplate"><article class="mini-word"><strong></strong><span></span><small></small></article></template>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

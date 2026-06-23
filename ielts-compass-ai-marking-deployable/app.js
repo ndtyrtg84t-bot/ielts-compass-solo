@@ -104,7 +104,7 @@ const defaultState = {
 let db, state = structuredClone(defaultState);
 let activeVocabModuleId = vocabModules[0]?.id || '';
 let vocabAnswerVisible = false;
-let pdfInterval = null;
+let pdfInterval = null, pdfDoc = null, pdfRenderTask = null, pdfScale = 1.25, pdfFitMode = true;
 let timerSeconds = 45 * 60, timerTotal = 45 * 60, timerInterval = null;
 let practiceSeconds = 0, practiceInterval = null, selectedAnswer = null, currentPromptIndex = 0, reminderInterval = null, mockInterval = null, deferredInstallPrompt = null, scribbleReady = false;
 const $ = selector => document.querySelector(selector);
@@ -153,6 +153,9 @@ function bindPdfDrillEvents() {
   $('#testBundleList')?.addEventListener('click', handleTestBundleClick);
   $('#pdfPrevBtn')?.addEventListener('click', () => changePdfPage(-1));
   $('#pdfNextBtn')?.addEventListener('click', () => changePdfPage(1));
+  $('#pdfZoomOutBtn')?.addEventListener('click', () => zoomPdf(-0.15));
+  $('#pdfZoomInBtn')?.addEventListener('click', () => zoomPdf(0.15));
+  $('#pdfFitBtn')?.addEventListener('click', fitPdfWidth);
   $('#buildAnswerSheetBtn')?.addEventListener('click', buildPdfAnswerSheet);
   $('#gradePdfBtn')?.addEventListener('click', gradePdfAnswers);
   $('#savePdfSessionBtn')?.addEventListener('click', savePdfSession);
@@ -176,9 +179,8 @@ function renderPdfDrill() {
   if (!$('#pdfTimer')) return;
   const pdf = state.pdfDrill || defaultState.pdfDrill;
   $('#pdfTimer').textContent = formatSeconds(pdf.secondsLeft || 0);
-  $('#pdfPageLabel').textContent = pdf.fileName ? `${pdf.fileName} · 第 ${pdf.page || 1} 页` : '未上传 PDF';
-  const frame = $('#pdfFrame');
-  if (frame && pdf.fileUrl) frame.src = `${pdf.fileUrl}#page=${pdf.page || 1}`;
+  $('#pdfPageLabel').textContent = pdf.fileName ? `${pdf.fileName} · 第 ${pdf.page || 1}/${pdf.totalPages || '?'} 页` : '未上传 PDF';
+  renderPdfPage();
   renderPdfAudioTracks();
   renderTestBundles();
   buildPdfAnswerSheet(false);
@@ -187,12 +189,97 @@ async function handlePdfUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   if (file.type !== 'application/pdf') { alert('请上传 PDF 文件。'); return; }
+  await loadPdfFileIntoState(file);
+  await saveState();
+  await ensurePdfDocument(true);
+  renderPdfDrill();
+}
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+function dataUrlToUint8Array(dataUrl) {
+  const base64 = String(dataUrl || '').split(',')[1];
+  if (!base64) return null;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+async function loadPdfFileIntoState(file) {
   if (state.pdfDrill.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(state.pdfDrill.fileUrl);
   state.pdfDrill.fileName = file.name;
   state.pdfDrill.fileUrl = URL.createObjectURL(file);
+  state.pdfDrill.pdfData = await fileToDataUrl(file);
   state.pdfDrill.page = 1;
-  await saveState();
-  renderPdfDrill();
+  state.pdfDrill.totalPages = 1;
+  pdfDoc = null;
+}
+async function ensurePdfDocument(force = false) {
+  const empty = $('#pdfCanvasEmpty');
+  if (!state.pdfDrill?.pdfData || !window.pdfjsLib) {
+    if (empty && state.pdfDrill?.fileName) empty.textContent = 'PDF.js 暂时没有加载成功，请检查网络后刷新页面。';
+    return null;
+  }
+  if (pdfDoc && !force) return pdfDoc;
+  if (window.pdfjsLib?.GlobalWorkerOptions) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const data = dataUrlToUint8Array(state.pdfDrill.pdfData);
+  if (!data) return null;
+  try {
+    pdfDoc = await window.pdfjsLib.getDocument({ data }).promise;
+    state.pdfDrill.totalPages = pdfDoc.numPages || 1;
+    state.pdfDrill.page = Math.min(Math.max(1, state.pdfDrill.page || 1), state.pdfDrill.totalPages);
+    return pdfDoc;
+  } catch (error) {
+    if (empty) empty.textContent = '这个 PDF 暂时无法网页化渲染，可以重新上传或换浏览器试试。';
+    return null;
+  }
+}
+async function renderPdfPage() {
+  const canvas = $('#pdfCanvas');
+  const shell = $('#pdfCanvasShell');
+  const empty = $('#pdfCanvasEmpty');
+  if (!canvas || !shell) return;
+  const doc = await ensurePdfDocument(false);
+  if (!doc) { canvas.classList.add('hidden'); empty?.classList.remove('hidden'); return; }
+  const pageNo = Math.min(Math.max(1, state.pdfDrill.page || 1), doc.numPages);
+  const page = await doc.getPage(pageNo);
+  const baseViewport = page.getViewport({ scale: 1 });
+  if (pdfFitMode) {
+    const available = Math.max(280, shell.clientWidth - 28);
+    pdfScale = Math.min(2.4, Math.max(0.55, available / baseViewport.width));
+  }
+  const viewport = page.getViewport({ scale: pdfScale });
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(viewport.width * ratio);
+  canvas.height = Math.floor(viewport.height * ratio);
+  canvas.style.width = `${Math.floor(viewport.width)}px`;
+  canvas.style.height = `${Math.floor(viewport.height)}px`;
+  canvas.classList.remove('hidden');
+  empty?.classList.add('hidden');
+  if (pdfRenderTask) { try { pdfRenderTask.cancel(); } catch (_) {} }
+  const context = canvas.getContext('2d');
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, viewport.width, viewport.height);
+  pdfRenderTask = page.render({ canvasContext: context, viewport });
+  try { await pdfRenderTask.promise; } catch (_) {}
+  pdfRenderTask = null;
+  $('#pdfPageLabel').textContent = `${state.pdfDrill.fileName} · 第 ${pageNo}/${doc.numPages} 页`;
+}
+async function zoomPdf(delta) {
+  pdfFitMode = false;
+  pdfScale = Math.min(3, Math.max(0.55, pdfScale + delta));
+  await renderPdfPage();
+}
+async function fitPdfWidth() {
+  pdfFitMode = true;
+  await renderPdfPage();
 }
 async function handlePdfAudioUpload(event) {
   const file = event.target.files?.[0];
@@ -208,7 +295,8 @@ function renderPdfAudioTracks() {
   box.innerHTML = tracks.map((track, index) => `<div class="pdf-audio-track"><strong>${escapeHTML(track.name || `Audio ${index + 1}`)}</strong><audio controls preload="metadata" src="${track.url}"></audio></div>`).join('');
 }
 async function changePdfPage(delta) {
-  state.pdfDrill.page = Math.max(1, (state.pdfDrill.page || 1) + delta);
+  const max = state.pdfDrill.totalPages || pdfDoc?.numPages || 9999;
+  state.pdfDrill.page = Math.min(max, Math.max(1, (state.pdfDrill.page || 1) + delta));
   const active = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
   if (active) active.lastPage = state.pdfDrill.page;
   await saveState();
@@ -265,6 +353,7 @@ async function createTestBundle(event) {
     title,
     pdfName: pdfFile.name,
     pdfUrl: URL.createObjectURL(pdfFile),
+    pdfData: await fileToDataUrl(pdfFile),
     audioTracks: validAudio.map(file => ({ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file) })),
     createdAt: new Date().toLocaleString(),
     lastPage: 1,
@@ -352,12 +441,13 @@ function matchAudioForPdf(pdfFile, audioGroups) {
   }
   return tracks.slice().sort((a, b) => audioSortScore(a) - audioSortScore(b));
 }
-function createBundleFromFiles(pdfFile, tracks) {
+async function createBundleFromFiles(pdfFile, tracks) {
   return {
     id: crypto.randomUUID(),
     title: pdfFile.name.replace(/\.pdf$/i, ''),
     pdfName: pdfFile.name,
     pdfUrl: URL.createObjectURL(pdfFile),
+    pdfData: await fileToDataUrl(pdfFile),
     audioTracks: tracks.map(file => ({ id: crypto.randomUUID(), name: file.name, path: file.webkitRelativePath || file.name, url: URL.createObjectURL(file) })),
     createdAt: new Date().toLocaleString(),
     lastPage: 1,
@@ -371,7 +461,7 @@ async function createBulkTestBundles(event) {
   const audioFiles = Array.from($('#bulkBundleAudio')?.files || []).filter(file => file.type.startsWith('audio/'));
   if (!pdfFiles.length) { alert('请先批量选择 PDF。'); return; }
   const audioGroups = filesToAudioGroups(audioFiles, false);
-  const bundles = pdfFiles.map(pdfFile => createBundleFromFiles(pdfFile, pdfFiles.length === 1 ? audioFiles : matchAudioForPdf(pdfFile, audioGroups)));
+  const bundles = await Promise.all(pdfFiles.map(pdfFile => createBundleFromFiles(pdfFile, pdfFiles.length === 1 ? audioFiles : matchAudioForPdf(pdfFile, audioGroups))));
   state.testBundles.unshift(...bundles);
   event.currentTarget.reset();
   await saveState();
@@ -422,7 +512,10 @@ async function loadTestBundle(bundleId) {
   state.pdfDrill.activeBundleId = bundle.id;
   state.pdfDrill.fileName = bundle.pdfName;
   state.pdfDrill.fileUrl = bundle.pdfUrl;
+  state.pdfDrill.pdfData = bundle.pdfData || null;
   state.pdfDrill.page = bundle.lastPage || 1;
+  pdfDoc = null;
+  await ensurePdfDocument(true);
   state.pdfDrill.audioTracks = bundle.audioTracks || [];
   state.pdfDrill.mode = bundle.audioTracks?.length ? 'listening' : 'reading';
   state.pdfDrill.secondsLeft = state.pdfDrill.mode === 'listening' ? 1800 : 3600;
@@ -435,7 +528,7 @@ async function deleteTestBundle(bundleId) {
   if (bundle?.pdfUrl?.startsWith('blob:')) URL.revokeObjectURL(bundle.pdfUrl);
   (bundle?.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) URL.revokeObjectURL(track.url); });
   state.testBundles = (state.testBundles || []).filter(item => item.id !== bundleId);
-  if (state.pdfDrill.activeBundleId === bundleId) { state.pdfDrill.activeBundleId = ''; state.pdfDrill.fileName = ''; state.pdfDrill.fileUrl = ''; state.pdfDrill.audioTracks = []; }
+  if (state.pdfDrill.activeBundleId === bundleId) { state.pdfDrill.activeBundleId = ''; state.pdfDrill.fileName = ''; state.pdfDrill.fileUrl = ''; state.pdfDrill.pdfData = null; state.pdfDrill.audioTracks = []; pdfDoc = null; }
   await saveState();
   renderPdfDrill();
 }

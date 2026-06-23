@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ielts-compass-scribble-up-v18';
+const CACHE_NAME = 'ielts-compass-pdf-canvas-v19';
 const ASSETS = [
   './',
   './index.html',

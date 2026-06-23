@@ -16,6 +16,9 @@ const coreWords = (window.IELTS_WORD_BANK && window.IELTS_WORD_BANK.length ? win
   { word: 'indicate', meaning: '表明；显示', example: 'The figures indicate a steady rise after 2015.' },
   { word: 'priority', meaning: '优先事项', example: 'Vocabulary review should be a daily priority.' }
 ]);
+const vocabModules = window.USER_VOCAB_MODULES || [];
+const importedPdfWords = window.USER_IMPORTED_WORD_BANK || vocabModules.flatMap(module => module.words.map(item => ({ word: item.word, meaning: item.meaning, example: item.example })));
+coreWords.push(...importedPdfWords.filter(item => !coreWords.some(word => word.word.toLowerCase() === String(item.word || '').toLowerCase())));
 const fullTests = window.IELTS_FULL_TESTS || [];
 const AI_ENDPOINTS = ['./api/mark-output', '/.netlify/functions/mark-output'];
 
@@ -60,6 +63,7 @@ const outputPrompts = [
 ];
 
 const highScoreResources = [
+
   { id: crypto.randomUUID(), name: 'IELTS 官方备考资源', type: '官方', level: '必用', url: 'https://ielts.org/take-a-test/preparation-resources', note: '官方样题、写作评分说明、课程、App、讲座、视频和书籍入口。' },
   { id: crypto.randomUUID(), name: 'British Council 免费练习题', type: '刷题', level: '必用', url: 'https://takeielts.britishcouncil.org/take-ielts/prepare/free-ielts-english-practice-tests', note: '覆盖听说读写的 Academic 与 General Training 样题。' },
   { id: crypto.randomUUID(), name: 'IDP IELTS Prepare Hub', type: '官方', level: '必用', url: 'https://ielts.idp.com/prepare', note: '含练习题、机考熟悉题、文章、视频、播客和自测工具。' },
@@ -90,12 +94,15 @@ const defaultState = {
   reminder: { enabled: false, time: '20:30', text: '该交今日雅思打卡了：刷题 + 错题 + 输出记录' },
   practice: { attempts: [], wrongbook: [], currentSet: 'reading', currentIndex: 0 },
   mock: { attempts: [], currentTestId: fullTests[0]?.id || '', answers: {}, startedAt: null, remaining: 0, audioNames: {}, audioUrls: {}, audioRates: {} },
-  vocab: coreWords.slice(0, 6).map(createWordCard), pdfDrill: { fileName: '', fileUrl: '', page: 1, totalPages: 1, mode: 'reading', secondsLeft: 3600, running: false, answers: {}, sessions: [] },
+  vocab: coreWords.slice(0, 6).map(createWordCard), pdfDrill: { fileName: '', fileUrl: '', page: 1, totalPages: 1, mode: 'reading', secondsLeft: 3600, running: false, answers: {}, sessions: [], audioTracks: [], activeBundleId: '' },
+  testBundles: [],
   outputs: [],
-  aiFeedback: null
+  aiFeedback: null,
+  vocabModuleProgress: {}
 };
 
 let db, state = structuredClone(defaultState);
+let activeVocabModuleId = vocabModules[0]?.id || '';
 let pdfInterval = null;
 let timerSeconds = 45 * 60, timerTotal = 45 * 60, timerInterval = null;
 let practiceSeconds = 0, practiceInterval = null, selectedAnswer = null, currentPromptIndex = 0, reminderInterval = null, mockInterval = null, deferredInstallPrompt = null, scribbleReady = false;
@@ -107,7 +114,8 @@ async function init() { db = await openDB(); $('#dbStatus').textContent = 'Index
 function openDB() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, DB_VERSION); request.onupgradeneeded = e => { const database = e.target.result; if (!database.objectStoreNames.contains(STORE)) database.createObjectStore(STORE); }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
 function getState() { return new Promise(resolve => { const tx = db.transaction(STORE, 'readonly'); const request = tx.objectStore(STORE).get(STATE_KEY); request.onsuccess = () => resolve(request.result || null); request.onerror = () => resolve(null); }); }
 function saveState() { return new Promise(resolve => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).put(state, STATE_KEY); tx.oncomplete = () => resolve(); }); }
-function mergeState(saved) { return { ...structuredClone(defaultState), ...saved, target: { ...defaultState.target, ...(saved.target || {}) }, reminder: { ...defaultState.reminder, ...(saved.reminder || {}) }, review: { ...defaultState.review, ...(saved.review || {}) }, practice: { ...defaultState.practice, ...(saved.practice || {}) }, mock: { ...defaultState.mock, ...(saved.mock || {}) }, vocab: saved.vocab?.length ? saved.vocab : defaultState.vocab, resources: saved.resources?.length ? saved.resources : highScoreResources, tasks: saved.tasks?.length ? saved.tasks : defaultState.tasks, checkins: saved.checkins?.length ? saved.checkins : defaultState.checkins, outputs: saved.outputs || [], aiFeedback: saved.aiFeedback || null }; }
+function mergeState(saved) { const merged = { ...structuredClone(defaultState), ...saved, target: { ...defaultState.target, ...(saved.target || {}) }, reminder: { ...defaultState.reminder, ...(saved.reminder || {}) }, review: { ...defaultState.review, ...(saved.review || {}) }, practice: { ...defaultState.practice, ...(saved.practice || {}) }, mock: { ...defaultState.mock, ...(saved.mock || {}) }, pdfDrill: { ...defaultState.pdfDrill, ...(saved.pdfDrill || {}) }, testBundles: saved.testBundles || [], vocab: saved.vocab?.length ? saved.vocab : defaultState.vocab, resources: saved.resources?.length ? saved.resources : highScoreResources, tasks: saved.tasks?.length ? saved.tasks : defaultState.tasks, checkins: saved.checkins?.length ? saved.checkins : defaultState.checkins, outputs: saved.outputs || [], aiFeedback: saved.aiFeedback || null, vocabModuleProgress: saved.vocabModuleProgress || {} }; mergeImportedContent(merged); return merged; }
+function mergeImportedContent(targetState) { const wordMap = new Map((targetState.vocab || []).map(item => [String(item.word || '').toLowerCase(), item])); importedPdfWords.forEach(item => { const key = String(item.word || '').toLowerCase(); if (key && !wordMap.has(key)) targetState.vocab.push(createWordCard(item)); }); const resourceMap = new Set((targetState.resources || []).map(item => item.url)); highScoreResources.forEach(item => { if (!resourceMap.has(item.url)) targetState.resources.push(item); }); }
 function bindEvents() {
   $('#loginForm').addEventListener('submit', e => { e.preventDefault(); login({ name: $('#loginName').value.trim(), email: $('#loginEmail').value.trim(), band: Number($('#loginBand').value), examDate: $('#loginExam').value }); });
   $('#demoLogin').addEventListener('click', () => login({ name: 'Solo Runner', email: 'solo@ielts.local', band: 7.5, examDate: nextExamDate() }));
@@ -122,6 +130,8 @@ function bindEvents() {
   $('#wordForm').addEventListener('submit', addWord);
   $('#seedWordsBtn').addEventListener('click', seedMoreWords);
   $('#clearScribbleBtn').addEventListener('click', clearScribblePad);
+  $('#vocabModuleTabs')?.addEventListener('click', handleVocabModuleTabClick);
+  $('#vocabModuleWords')?.addEventListener('click', handleVocabModuleWordClick);
   $('#forgotWordBtn').addEventListener('click', () => reviewWord(false));
   $('#knowWordBtn').addEventListener('click', () => reviewWord(true));
   $('#installBtn').addEventListener('click', installApp);
@@ -134,6 +144,9 @@ function bindEvents() {
 function bindPdfDrillEvents() {
   $('#pdfInput')?.addEventListener('change', handlePdfUpload);
   $('#pdfAudioInput')?.addEventListener('change', handlePdfAudioUpload);
+  $('#testBundleForm')?.addEventListener('submit', createTestBundle);
+  $('#bulkBundleForm')?.addEventListener('submit', createBulkTestBundles);
+  $('#testBundleList')?.addEventListener('click', handleTestBundleClick);
   $('#pdfPrevBtn')?.addEventListener('click', () => changePdfPage(-1));
   $('#pdfNextBtn')?.addEventListener('click', () => changePdfPage(1));
   $('#buildAnswerSheetBtn')?.addEventListener('click', buildPdfAnswerSheet);
@@ -162,6 +175,8 @@ function renderPdfDrill() {
   $('#pdfPageLabel').textContent = pdf.fileName ? `${pdf.fileName} · 第 ${pdf.page || 1} 页` : '未上传 PDF';
   const frame = $('#pdfFrame');
   if (frame && pdf.fileUrl) frame.src = `${pdf.fileUrl}#page=${pdf.page || 1}`;
+  renderPdfAudioTracks();
+  renderTestBundles();
   buildPdfAnswerSheet(false);
 }
 async function handlePdfUpload(event) {
@@ -175,16 +190,23 @@ async function handlePdfUpload(event) {
   await saveState();
   renderPdfDrill();
 }
-function handlePdfAudioUpload(event) {
+async function handlePdfAudioUpload(event) {
   const file = event.target.files?.[0];
   if (!file || !file.type.startsWith('audio/')) return;
-  const url = URL.createObjectURL(file);
-  const box = $('#pdfAudioBox');
-  box.classList.remove('hidden');
-  box.innerHTML = `<strong>${escapeHTML(file.name)}</strong><audio controls preload="metadata" src="${url}"></audio>`;
+  state.pdfDrill.audioTracks = [{ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file) }];
+  await saveState();
+  renderPdfAudioTracks();
+}
+function renderPdfAudioTracks() {
+  const box = $('#pdfAudioBox'); if (!box) return;
+  const tracks = state.pdfDrill.audioTracks || [];
+  box.classList.toggle('hidden', !tracks.length);
+  box.innerHTML = tracks.map((track, index) => `<div class="pdf-audio-track"><strong>${escapeHTML(track.name || `Audio ${index + 1}`)}</strong><audio controls preload="metadata" src="${track.url}"></audio></div>`).join('');
 }
 async function changePdfPage(delta) {
   state.pdfDrill.page = Math.max(1, (state.pdfDrill.page || 1) + delta);
+  const active = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
+  if (active) active.lastPage = state.pdfDrill.page;
   await saveState();
   renderPdfDrill();
 }
@@ -222,9 +244,122 @@ async function gradePdfAnswers() {
   $('#pdfResult').innerHTML = `<h3>PDF 刷题判分：${correct}/${nums.length} · ${score}%</h3><ol>${details}</ol>`;
 }
 async function savePdfSession() {
-  state.pdfDrill.sessions.unshift({ id: crypto.randomUUID(), fileName: state.pdfDrill.fileName || '未命名 PDF', date: new Date().toLocaleString(), answers: { ...(state.pdfDrill.answers || {}) } });
+  state.pdfDrill.sessions.unshift({ id: crypto.randomUUID(), fileName: state.pdfDrill.fileName || '未命名 PDF', bundleId: state.pdfDrill.activeBundleId || '', date: new Date().toLocaleString(), answers: { ...(state.pdfDrill.answers || {}) } });
   await saveState();
   $('#pdfResult').innerHTML = '<p class="empty">本次 PDF 刷题记录已保存。</p>';
+}
+
+async function createTestBundle(event) {
+  event.preventDefault();
+  const pdfFile = $('#testBundlePdf')?.files?.[0];
+  const audioFiles = Array.from($('#testBundleAudio')?.files || []);
+  if (!pdfFile || pdfFile.type !== 'application/pdf') { alert('请先选择这套题的 PDF。'); return; }
+  const validAudio = audioFiles.filter(file => file.type.startsWith('audio/'));
+  const title = $('#testBundleName').value.trim() || pdfFile.name.replace(/\.pdf$/i, '');
+  const bundle = {
+    id: crypto.randomUUID(),
+    title,
+    pdfName: pdfFile.name,
+    pdfUrl: URL.createObjectURL(pdfFile),
+    audioTracks: validAudio.map(file => ({ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file) })),
+    createdAt: new Date().toLocaleString(),
+    lastPage: 1,
+    questionCount: validAudio.length ? 40 : 40,
+  };
+  state.testBundles.unshift(bundle);
+  event.currentTarget.reset();
+  await saveState();
+  renderTestBundles();
+  loadTestBundle(bundle.id);
+}
+
+function normalizeBundleKey(name) {
+  let base = String(name || '').replace(/\.[^.]+$/i, '').toLowerCase();
+  base = base.replace(/[【】\[\]()（）{}]/g, ' ').replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const cam = base.match(/(?:cambridge|剑桥|c)\s*(\d{1,2})\s*(?:test|t|套题)?\s*(\d{1,2})/i);
+  if (cam) return `cambridge-${cam[1]}-test-${cam[2]}`;
+  const test = base.match(/(?:test|t|套题|真题|practice test)\s*(\d{1,2})/i);
+  if (test) return `test-${test[1]}`;
+  const bookTest = base.match(/(\d{1,2})\s*(?:test|t)\s*(\d{1,2})/i);
+  if (bookTest) return `book-${bookTest[1]}-test-${bookTest[2]}`;
+  return base.replace(/\b(section|part|audio|listening|reading|questions?|answer|key|track|cd)\b/gi, '').replace(/\b\d{1,2}\b/g, '').replace(/\s+/g, ' ').trim() || base;
+}
+function audioSortScore(file) {
+  const name = file.name.toLowerCase();
+  const section = name.match(/(?:section|part|track|s)\s*0?(\d{1,2})/i);
+  if (section) return Number(section[1]);
+  const nums = name.match(/\d{1,2}/g);
+  return nums ? Number(nums[nums.length - 1]) : 99;
+}
+async function createBulkTestBundles(event) {
+  event.preventDefault();
+  const pdfFiles = Array.from($('#bulkBundlePdf')?.files || []).filter(file => file.type === 'application/pdf');
+  const audioFiles = Array.from($('#bulkBundleAudio')?.files || []).filter(file => file.type.startsWith('audio/'));
+  if (!pdfFiles.length) { alert('请先批量选择 PDF。'); return; }
+  const audioGroups = new Map();
+  audioFiles.forEach(file => { const key = normalizeBundleKey(file.name); if (!audioGroups.has(key)) audioGroups.set(key, []); audioGroups.get(key).push(file); });
+  const bundles = pdfFiles.map(pdfFile => {
+    const key = normalizeBundleKey(pdfFile.name);
+    let tracks = audioGroups.get(key) || [];
+    if (!tracks.length && pdfFiles.length === 1) tracks = audioFiles;
+    if (!tracks.length) {
+      const fuzzy = Array.from(audioGroups.entries()).find(([audioKey]) => audioKey.includes(key) || key.includes(audioKey));
+      if (fuzzy) tracks = fuzzy[1];
+    }
+    tracks = tracks.slice().sort((a, b) => audioSortScore(a) - audioSortScore(b));
+    return {
+      id: crypto.randomUUID(),
+      title: pdfFile.name.replace(/\.pdf$/i, ''),
+      pdfName: pdfFile.name,
+      pdfUrl: URL.createObjectURL(pdfFile),
+      audioTracks: tracks.map(file => ({ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file) })),
+      createdAt: new Date().toLocaleString(),
+      lastPage: 1,
+      questionCount: 40,
+      groupKey: key,
+    };
+  });
+  state.testBundles.unshift(...bundles);
+  event.currentTarget.reset();
+  await saveState();
+  renderTestBundles();
+  const matched = bundles.filter(bundle => bundle.audioTracks.length).length;
+  $('#bulkBundleStatus').textContent = `已生成 ${bundles.length} 套题，其中 ${matched} 套自动匹配到音频。`;
+  if (bundles[0]) await loadTestBundle(bundles[0].id);
+}
+function renderTestBundles() {
+  const list = $('#testBundleList'); if (!list) return;
+  const bundles = state.testBundles || [];
+  if (!bundles.length) { list.innerHTML = '<p class="empty">还没有套题。选择 PDF 和音频后，会自动出现在这里。</p>'; return; }
+  list.innerHTML = bundles.map(bundle => `<article class="test-bundle-card ${state.pdfDrill.activeBundleId === bundle.id ? 'active' : ''}"><div><strong>${escapeHTML(bundle.title)}</strong><span>${escapeHTML(bundle.pdfName)} · ${bundle.audioTracks?.length || 0} 条音频</span><small>${escapeHTML(bundle.createdAt || '')}</small></div><div class="test-bundle-actions"><button type="button" data-load-bundle="${bundle.id}">开始这套</button><button type="button" class="ghost-btn" data-delete-bundle="${bundle.id}">删除</button></div></article>`).join('');
+}
+async function handleTestBundleClick(event) {
+  const load = event.target.closest('[data-load-bundle]');
+  const del = event.target.closest('[data-delete-bundle]');
+  if (load) { await loadTestBundle(load.dataset.loadBundle); return; }
+  if (del) { await deleteTestBundle(del.dataset.deleteBundle); }
+}
+async function loadTestBundle(bundleId) {
+  const bundle = (state.testBundles || []).find(item => item.id === bundleId); if (!bundle) return;
+  state.pdfDrill.activeBundleId = bundle.id;
+  state.pdfDrill.fileName = bundle.pdfName;
+  state.pdfDrill.fileUrl = bundle.pdfUrl;
+  state.pdfDrill.page = bundle.lastPage || 1;
+  state.pdfDrill.audioTracks = bundle.audioTracks || [];
+  state.pdfDrill.mode = bundle.audioTracks?.length ? 'listening' : 'reading';
+  state.pdfDrill.secondsLeft = state.pdfDrill.mode === 'listening' ? 1800 : 3600;
+  $('#pdfQuestionCount').value = bundle.questionCount || 40;
+  await saveState();
+  renderPdfDrill();
+}
+async function deleteTestBundle(bundleId) {
+  const bundle = (state.testBundles || []).find(item => item.id === bundleId);
+  if (bundle?.pdfUrl?.startsWith('blob:')) URL.revokeObjectURL(bundle.pdfUrl);
+  (bundle?.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) URL.revokeObjectURL(track.url); });
+  state.testBundles = (state.testBundles || []).filter(item => item.id !== bundleId);
+  if (state.pdfDrill.activeBundleId === bundleId) { state.pdfDrill.activeBundleId = ''; state.pdfDrill.fileName = ''; state.pdfDrill.fileUrl = ''; state.pdfDrill.audioTracks = []; }
+  await saveState();
+  renderPdfDrill();
 }
 function startPdfTimer() {
   clearInterval(pdfInterval);
@@ -381,11 +516,60 @@ function clearScribblePad() { const canvas = $('#scribbleCanvas'); if (!canvas) 
 function createWordCard(item) { const today = toDateKey(new Date()); return { id: crypto.randomUUID(), word: item.word, meaning: item.meaning, example: item.example || '', stage: 0, due: today, correctCount: 0, missCount: 0, createdAt: today }; }
 function getDueWords() { const today = toDateKey(new Date()); return (state.vocab || []).filter(w => w.due <= today); }
 function currentDueWord() { return getDueWords()[0] || null; }
-function renderVocab() { const due = getDueWords(); const word = due[0]; $('#wordDue').textContent = `今日待复习 ${due.length}`; if (!word) { $('#wordStage').textContent = 'Done'; $('#wordText').textContent = '今天的单词已完成'; $('#wordMeaning').textContent = '可以添加新词，或明天按记忆曲线继续复习。'; $('#wordExample').textContent = ''; } else { $('#wordStage').textContent = `第 ${word.stage + 1} 轮 · 间隔 ${MEMORY_STEPS[word.stage] || 30} 天`; $('#wordText').textContent = word.word; $('#wordMeaning').textContent = word.meaning; $('#wordExample').textContent = word.example ? `例句：${word.example}` : ''; } renderWordList(); }
+function renderVocab() { const due = getDueWords(); const word = due[0]; $('#wordDue').textContent = `今日待复习 ${due.length}`; if (!word) { $('#wordStage').textContent = 'Done'; $('#wordText').textContent = '今天的单词已完成'; $('#wordMeaning').textContent = '可以添加新词，或明天按记忆曲线继续复习。'; $('#wordExample').textContent = ''; } else { $('#wordStage').textContent = `第 ${word.stage + 1} 轮 · 间隔 ${MEMORY_STEPS[word.stage] || 30} 天`; $('#wordText').textContent = word.word; $('#wordMeaning').textContent = word.meaning; $('#wordExample').textContent = word.example ? `例句：${word.example}` : ''; } renderWordList(); renderVocabModules(); }
 async function addWord(event) { event.preventDefault(); state.vocab.unshift(createWordCard({ word: $('#newWord').value.trim(), meaning: $('#newMeaning').value.trim(), example: $('#newExample').value.trim() })); event.currentTarget.reset(); await saveState(); renderVocab(); renderMetrics(); }
 async function seedMoreWords() { const existing = new Set((state.vocab || []).map(w => w.word.toLowerCase())); coreWords.filter(w => !existing.has(w.word.toLowerCase())).forEach(w => state.vocab.push(createWordCard(w))); await saveState(); renderVocab(); renderMetrics(); }
 async function reviewWord(known) { const word = currentDueWord(); if (!word) return; if (known) { word.correctCount += 1; word.stage = Math.min(word.stage + 1, MEMORY_STEPS.length - 1); } else { word.missCount += 1; word.stage = 1; } const next = new Date(); next.setDate(next.getDate() + (known ? MEMORY_STEPS[word.stage] : 1)); word.due = toDateKey(next); await saveState(); renderVocab(); renderMetrics(); }
 function renderWordList() { const list = $('#wordList'); const template = $('#wordTemplate'); list.innerHTML = ''; (state.vocab || []).slice().sort((a, b) => a.due.localeCompare(b.due)).slice(0, 12).forEach(word => { const node = template.content.firstElementChild.cloneNode(true); node.querySelector('strong').textContent = word.word; node.querySelector('span').textContent = word.meaning; node.querySelector('small').textContent = `下次：${word.due} · 第 ${word.stage + 1} 轮`; list.appendChild(node); }); }
+function moduleProgress(moduleId, wordNumber) { const key = String(wordNumber); const bucket = state.vocabModuleProgress[moduleId] || {}; return bucket[key] || {}; }
+function renderVocabModules() {
+  const tabs = $('#vocabModuleTabs'); const box = $('#vocabModuleWords');
+  if (!tabs || !box) return;
+  if (!vocabModules.length) { tabs.innerHTML = ''; box.innerHTML = '<p class="empty">还没有识别到 PDF 单词模块。</p>'; return; }
+  if (!activeVocabModuleId || !vocabModules.some(module => module.id === activeVocabModuleId)) activeVocabModuleId = vocabModules[0].id;
+  const total = vocabModules.reduce((sum, module) => sum + module.words.length, 0);
+  const doneTotal = vocabModules.reduce((sum, module) => sum + module.words.filter(word => moduleProgress(module.id, word.number).done).length, 0);
+  $('#vocabModuleCount').textContent = `已提取 ${total} 个词`;
+  $('#vocabModuleSummary').textContent = `已勾选 ${doneTotal}/${total} · 点词卡标重点`;
+  tabs.innerHTML = vocabModules.map(module => {
+    const done = module.words.filter(word => moduleProgress(module.id, word.number).done).length;
+    return `<button type="button" class="${module.id === activeVocabModuleId ? 'active' : ''}" data-vocab-module="${module.id}"><span>${escapeHTML(module.title)}</span><small>${done}/${module.count}</small></button>`;
+  }).join('');
+  const module = vocabModules.find(item => item.id === activeVocabModuleId) || vocabModules[0];
+  const done = module.words.filter(word => moduleProgress(module.id, word.number).done).length;
+  const starred = module.words.filter(word => moduleProgress(module.id, word.number).star).length;
+  box.innerHTML = `<div class="vocab-module-toolbar"><div><strong>${escapeHTML(module.title)}</strong><span>${escapeHTML(module.chapter)} · ${done}/${module.count} 已勾选 · ${starred} 个重点</span></div><button type="button" data-vocab-module-add="${module.id}">整组加入记忆曲线</button></div><div class="module-word-grid">${module.words.map(word => renderModuleWord(module.id, word)).join('')}</div>`;
+}
+function renderModuleWord(moduleId, word) {
+  const progress = moduleProgress(moduleId, word.number);
+  return `<article class="module-word ${progress.done ? 'is-done' : ''} ${progress.star ? 'is-starred' : ''}" data-module-word="${moduleId}" data-word-number="${word.number}"><button type="button" class="word-check" data-module-done="${moduleId}" data-word-number="${word.number}" aria-label="勾选 ${escapeHTML(word.word)}">${progress.done ? '✓' : ''}</button><div><strong>${word.number}. ${escapeHTML(word.word)}</strong><span>${escapeHTML(word.meaning)}</span><small>${escapeHTML(word.example || '')}</small></div><button type="button" class="word-star" data-module-star="${moduleId}" data-word-number="${word.number}" aria-label="标重点">${progress.star ? '★' : '☆'}</button><button type="button" class="word-add" data-module-add-word="${moduleId}" data-word-number="${word.number}">加入曲线</button></article>`;
+}
+function handleVocabModuleTabClick(event) { const target = event.target.closest('[data-vocab-module]'); if (!target) return; activeVocabModuleId = target.dataset.vocabModule; renderVocabModules(); }
+async function handleVocabModuleWordClick(event) {
+  const doneBtn = event.target.closest('[data-module-done]');
+  const starBtn = event.target.closest('[data-module-star]');
+  const addWordBtn = event.target.closest('[data-module-add-word]');
+  const addModuleBtn = event.target.closest('[data-vocab-module-add]');
+  if (doneBtn) { updateModuleProgress(doneBtn.dataset.moduleDone, doneBtn.dataset.wordNumber, 'done'); await saveState(); renderVocabModules(); return; }
+  if (starBtn) { updateModuleProgress(starBtn.dataset.moduleStar, starBtn.dataset.wordNumber, 'star'); await saveState(); renderVocabModules(); return; }
+  if (addWordBtn) { await addModuleWordsToMemory(addWordBtn.dataset.moduleAddWord, addWordBtn.dataset.wordNumber); return; }
+  if (addModuleBtn) { await addModuleWordsToMemory(addModuleBtn.dataset.vocabModuleAdd); }
+}
+function updateModuleProgress(moduleId, wordNumber, field) {
+  if (!state.vocabModuleProgress[moduleId]) state.vocabModuleProgress[moduleId] = {};
+  const key = String(wordNumber);
+  state.vocabModuleProgress[moduleId][key] = { ...(state.vocabModuleProgress[moduleId][key] || {}), [field]: !state.vocabModuleProgress[moduleId][key]?.[field] };
+}
+async function addModuleWordsToMemory(moduleId, wordNumber = null) {
+  const module = vocabModules.find(item => item.id === moduleId); if (!module) return;
+  const words = wordNumber ? module.words.filter(word => String(word.number) === String(wordNumber)) : module.words;
+  const existing = new Set((state.vocab || []).map(item => String(item.word || '').toLowerCase()));
+  let added = 0;
+  words.forEach(word => { const key = String(word.word || '').toLowerCase(); if (key && !existing.has(key)) { state.vocab.push(createWordCard(word)); existing.add(key); added += 1; } });
+  await saveState(); renderVocab(); renderMetrics();
+  alert(added ? `已加入 ${added} 个词到记忆曲线。` : '这些词已经在记忆曲线里了。');
+}
+
 function installApp() { if (window.deferredInstallPrompt) { window.deferredInstallPrompt.prompt(); return; } alert('如果浏览器没有弹出安装按钮：iPhone/iPad 用 Safari 分享 → 添加到主屏幕；Android/Chrome 用菜单 → 安装应用或添加到主屏幕。'); }
 function registerServiceWorker() { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(() => {}); }
 window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); window.deferredInstallPrompt = event; });
@@ -484,7 +668,7 @@ function toggleTimer() { if (timerInterval) { clearInterval(timerInterval); time
 async function enableReminder() { if ('Notification' in window && Notification.permission !== 'granted') await Notification.requestPermission(); state.reminder = { enabled: true, time: $('#reminderTime').value, text: $('#reminderText').value }; await saveState(); renderReminder(); startReminderLoop(); }
 function startReminderLoop() { clearInterval(reminderInterval); reminderInterval = setInterval(() => { if (!state.reminder.enabled) return; const now = new Date(); const current = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; if (current === state.reminder.time && now.getSeconds() < 5) notify('IELTS Compass 提醒', state.reminder.text); }, 5000); }
 function notify(title, body) { if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body }); else alert(`${title}\n${body}`); }
-function exportJSON() { const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'ielts-compass-solo-backup.json'; a.click(); URL.revokeObjectURL(url); }
+function exportJSON() { const backup = JSON.parse(JSON.stringify(state)); (backup.testBundles || []).forEach(bundle => { bundle.pdfUrl = bundle.pdfUrl?.startsWith('blob:') ? '' : bundle.pdfUrl; (bundle.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) track.url = ''; }); }); if (backup.pdfDrill?.fileUrl?.startsWith('blob:')) backup.pdfDrill.fileUrl = ''; if (backup.pdfDrill?.audioTracks) backup.pdfDrill.audioTracks.forEach(track => { if (track.url?.startsWith('blob:')) track.url = ''; }); const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'ielts-compass-solo-backup.json'; a.click(); URL.revokeObjectURL(url); }
 function importJSON(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = async () => { state = mergeState(JSON.parse(reader.result)); await saveState(); render(); }; reader.readAsText(file); }
 function recentCheckins(days) { const keys = new Set(); const today = startOfDay(new Date()); for (let i = 0; i < days; i++) { const d = new Date(today); d.setDate(today.getDate() - i); keys.add(toDateKey(d)); } return state.checkins.filter(i => keys.has(i.date)); }
 function seedCheckins() { const today = startOfDay(new Date()); return [0,45,80,120,0,150,95,60,130,0,110,160,75,125].map((v,i,a) => { const d = new Date(today); d.setDate(today.getDate() - (a.length - 1 - i)); return { date: toDateKey(d), minutes: v, words: v ? Math.round(v / 4) : 0, questions: v ? Math.round(v / 10) : 0, note: '' }; }); }

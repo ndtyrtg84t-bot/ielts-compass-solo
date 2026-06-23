@@ -13,6 +13,7 @@
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="./styles.css" />
   <script src="./vocab-data.js"></script>
+  <script src="./user-vocab-modules.js"></script>
   <script src="./test-data.js"></script>
 </head>
 <body>
@@ -143,9 +144,28 @@
           </div>
           <div class="pdf-mode-tabs"><button class="chip active" data-pdf-mode="reading" type="button">阅读 60min</button><button class="chip" data-pdf-mode="listening" type="button">听力 30min</button><button class="chip" data-pdf-mode="custom" type="button">自定义</button></div>
         </div>
+        <div class="test-import-card">
+          <div>
+            <strong>真题套题导入</strong>
+            <span>可单套导入，也可批量自动分组</span>
+          </div>
+          <form id="testBundleForm" class="test-bundle-form">
+            <label>套题名称<input id="testBundleName" type="text" placeholder="例如：Test 1 / Cambridge 18 Test 1"></label>
+            <label class="file-import">选择 PDF<input id="testBundlePdf" type="file" accept="application/pdf"></label>
+            <label class="file-import">选择音频<input id="testBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" multiple></label>
+            <button type="submit">生成套题卡片</button>
+          </form>
+          <form id="bulkBundleForm" class="bulk-bundle-form">
+            <label class="file-import">批量选择 PDF<input id="bulkBundlePdf" type="file" accept="application/pdf" multiple></label>
+            <label class="file-import">批量选择音频<input id="bulkBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" multiple></label>
+            <button type="submit">自动分组导入</button>
+          </form>
+          <p id="bulkBundleStatus" class="muted">文件名里含有同样的 Test 编号、套题编号或 Cambridge 编号时，会自动归到一组。</p>
+          <div id="testBundleList" class="test-bundle-list"></div>
+        </div>
         <div class="pdf-toolbar">
-          <label class="file-import">上传 PDF<input id="pdfInput" type="file" accept="application/pdf"></label>
-          <label class="file-import">上传音频<input id="pdfAudioInput" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg"></label>
+          <label class="file-import">单独上传 PDF<input id="pdfInput" type="file" accept="application/pdf"></label>
+          <label class="file-import">单独上传音频<input id="pdfAudioInput" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg"></label>
           <div class="pdf-clock"><span>刷题计时</span><strong id="pdfTimer">60:00</strong></div>
           <button id="pdfStartBtn" type="button">开始</button>
           <button id="pdfPauseBtn" class="ghost-btn" type="button">暂停</button>
@@ -194,6 +214,27 @@
             <label>例句<textarea id="newExample" rows="4" placeholder="The government should allocate more funding to public transport."></textarea></label>
             <button type="submit">加入记忆曲线</button>
           </form>
+        </div>
+
+
+        <div class="vocab-pdf-card vocab-module-board">
+          <div class="vocab-pdf-head">
+            <div><strong>List 模块背诵</strong><span id="vocabModuleSummary">按 List 勾选、标重点、加入记忆曲线</span></div>
+            <small id="vocabModuleCount">已提取 3633 个词</small>
+          </div>
+          <div id="vocabModuleTabs" class="vocab-module-tabs" aria-label="单词 List 模块"></div>
+          <div id="vocabModuleWords" class="vocab-module-words"></div>
+          <div class="vocab-pdf-grid vocab-pdf-links">
+            <a href="./pdf-assets/list1~10.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 1-10</a>
+            <a href="./pdf-assets/list11~16.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 11-16</a>
+            <a href="./pdf-assets/list17~27.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 17-27</a>
+            <a href="./pdf-assets/list28~37.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 28-37</a>
+            <a href="./pdf-assets/list38~47.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 38-47</a>
+            <a href="./pdf-assets/list48~56.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 48-56</a>
+            <a href="./pdf-assets/list57~63.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 57-63</a>
+            <a href="./pdf-assets/英译中.pdf" target="_blank" rel="noopener noreferrer">英译中</a>
+            <a href="./pdf-assets/中译英.pdf" target="_blank" rel="noopener noreferrer">中译英</a>
+          </div>
         </div>
 
         <div class="vocab-import-card">

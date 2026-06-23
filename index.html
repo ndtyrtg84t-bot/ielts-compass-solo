@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f3ead7" />
+  <title>IELTS Compass Solo｜单人雅思刷题监督系统</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,760&family=Noto+Serif+SC:wght@500;700;900&family=Source+Sans+3:wght@400;520;650;750;850&display=swap" rel="stylesheet">
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./vocab-data.js"></script>
+  <script src="./user-vocab-modules.js"></script>
+  <script src="./test-data.js"></script>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <section id="authScreen" class="auth-screen">
+    <div class="auth-copy">
+      <h1>雅思监督系统</h1>
+      <p class="slogan">小顾加油！</p>
+    </div>
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <span class="stamp">SOLO</span>
+      <h2>建立备考档案</h2>
+      <label>昵称<input id="loginName" type="text" placeholder="例如：Alex" required></label>
+      <label>邮箱<input id="loginEmail" type="email" placeholder="you@example.com" required></label>
+      <div class="two-col">
+        <label>目标分<input id="loginBand" type="number" min="0" max="9" step="0.5" value="7.0" required></label>
+        <label>考试日期<input id="loginExam" type="date" required></label>
+      </div>
+      <button type="submit">进入系统</button>
+      <button id="demoLogin" class="ghost-btn" type="button">快速进入</button>
+    </form>
+  </section>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <a class="brand" href="#dashboard" aria-label="IELTS Compass Solo 首页">
+        <span class="brand-mark">IC</span>
+        <span><strong>IELTS Compass</strong><small>Solo practice</small></span>
+      </a>
+      <nav aria-label="主要导航">
+        <a href="#dashboard">总览</a>
+        <a href="#practice">刷题训练</a>
+        <a href="#exam">模拟考试</a>
+        <a href="#pdfdrill">PDF刷题</a>
+        <a href="#vocab">背单词</a>
+        <a href="#wrongbook">错题本</a>
+        <a href="#output">写作口语</a>
+        <a href="#resources">高分链接库</a>
+        <a href="#plan">今日计划</a>
+        <a href="#timer">倒计时提醒</a>
+        <a href="#review">周复盘</a>
+      </nav>
+      <button id="logoutBtn" class="text-btn" type="button">退出</button>
+    </aside>
+
+    <main class="content">
+      <header class="mobile-topbar"><strong>IELTS Compass Solo</strong><button id="mobileMenuBtn" type="button">菜单</button></header>
+
+      <section id="dashboard" class="hero-panel panel app-view">
+        <div class="home-copy">
+          <h2>雅思监督系统</h2>
+          <p class="hero-slogan">小顾加油！</p>
+          <div class="home-actions" aria-label="快捷入口">
+            <a href="#practice">开始刷题</a>
+            <a href="#vocab">背单词</a>
+            <a href="#plan">今日安排</a>
+          </div>
+        </div>
+        <div class="profile-card"><span id="userInitial">I</span><div><strong id="userName">IELTS Learner</strong><small id="userEmail">local account</small></div></div>
+      </section>
+
+      <section class="metric-grid dashboard-only">
+        <article class="metric-card countdown-card"><small>距离考试</small><strong id="daysLeft">--</strong><span>天</span></article>
+        <article class="metric-card"><small>刷题正确率</small><strong id="accuracyRate">0%</strong><div class="mini-bar"><i id="accuracyBar"></i></div></article>
+        <article class="metric-card"><small>错题待消化</small><strong id="wrongCount">0</strong><span>items</span></article>
+        <article class="metric-card"><small>今日待复习单词</small><strong id="dueWordCount">0</strong><span>words</span></article>
+        <article class="metric-card"><small>本周学习</small><strong id="weeklyMinutes">0</strong><span>min</span></article>
+      </section>
+
+      <section id="practice" class="panel practice-panel app-view">
+        <div class="section-head">
+          <div>
+            <h2>刷题训练</h2>
+          </div>
+          <div class="filter-row">
+            <button class="chip active" data-practice="reading" type="button">阅读</button>
+            <button class="chip" data-practice="listening" type="button">听力</button>
+            <button class="chip" data-practice="vocabulary" type="button">词汇</button>
+          </div>
+        </div>
+
+        <div class="practice-layout">
+          <article class="passage-card">
+            <div class="passage-meta"><span id="practiceModule">Reading</span><span id="practiceTimer">00:00</span></div>
+            <h3 id="practiceTitle">题组标题</h3>
+            <div id="practicePassage" class="passage-text"></div>
+            <div class="practice-actions">
+              <button id="startPracticeBtn" type="button">开始本组计时</button>
+              <button id="resetPracticeBtn" class="ghost-btn" type="button">重置本组</button>
+            </div>
+          </article>
+
+          <article class="question-card">
+            <div class="question-top"><span id="questionIndex">1 / 1</span><strong id="questionType">Multiple choice</strong></div>
+            <h3 id="questionText">题目</h3>
+            <div id="optionList" class="option-list"></div>
+            <div id="answerFeedback" class="answer-feedback"></div>
+            <div class="question-actions">
+              <button id="submitAnswerBtn" type="button">提交答案</button>
+              <button id="nextQuestionBtn" class="ghost-btn" type="button">下一题</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="exam" class="panel exam-panel app-view">
+        <div class="section-head">
+          <div>
+            <h2>模拟考试</h2>
+          </div>
+          <button id="startMockBtn" class="pill-btn" type="button">开始模拟考试</button>
+        </div>
+        <div class="mock-toolbar">
+          <label>选择套题<select id="mockSelect"></select></label>
+          <div class="mock-clock"><span>剩余时间</span><strong id="mockTimer">--:--</strong></div>
+          <button id="submitMockBtn" class="ghost-btn" type="button">提交并判分</button>
+        </div>
+        <div id="mockArea" class="mock-area"></div>
+        <div id="mockResult" class="mock-result"></div>
+      </section>
+
+
+      <section id="pdfdrill" class="panel pdf-panel app-view">
+        <div class="section-head">
+          <div>
+            <h2>PDF 刷题</h2>
+          </div>
+          <div class="pdf-mode-tabs"><button class="chip active" data-pdf-mode="reading" type="button">阅读 60min</button><button class="chip" data-pdf-mode="listening" type="button">听力 30min</button><button class="chip" data-pdf-mode="custom" type="button">自定义</button></div>
+        </div>
+        <div class="test-import-card">
+          <div>
+            <strong>真题套题导入</strong>
+            <span>可单套导入，也可批量自动分组</span>
+          </div>
+          <form id="testBundleForm" class="test-bundle-form">
+            <label>套题名称<input id="testBundleName" type="text" placeholder="例如：Test 1 / Cambridge 18 Test 1"></label>
+            <label class="file-import">选择 PDF<input id="testBundlePdf" type="file" accept="application/pdf"></label>
+            <label class="file-import">选择音频<input id="testBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" multiple></label>
+            <button type="submit">生成套题卡片</button>
+          </form>
+          <form id="bulkBundleForm" class="bulk-bundle-form">
+            <label class="file-import">批量选择 PDF<input id="bulkBundlePdf" type="file" accept="application/pdf" multiple></label>
+            <label class="file-import">批量选择音频<input id="bulkBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" multiple></label>
+            <button type="submit">自动分组导入</button>
+          </form>
+          <form id="folderBundleForm" class="bulk-bundle-form folder-bundle-form">
+            <label class="file-import">选择音频总文件夹<input id="folderBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" webkitdirectory directory multiple></label>
+            <button type="submit">按文件夹匹配音频</button>
+          </form>
+          <p id="bulkBundleStatus" class="muted">PDF 可以批量选；音频可以批量选文件，也可以选择“音频4-19”总文件夹。系统会按 剑4 /【4】/Cambridge 4 / 真题4 自动配对。</p>
+          <div id="testBundleList" class="test-bundle-list"></div>
+        </div>
+        <div class="pdf-toolbar">
+          <label class="file-import">单独上传 PDF<input id="pdfInput" type="file" accept="application/pdf"></label>
+          <label class="file-import">单独上传音频<input id="pdfAudioInput" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg"></label>
+          <div class="pdf-clock"><span>刷题计时</span><strong id="pdfTimer">60:00</strong></div>
+          <button id="pdfStartBtn" type="button">开始</button>
+          <button id="pdfPauseBtn" class="ghost-btn" type="button">暂停</button>
+          <button id="pdfEndBtn" class="text-btn" type="button">结束</button>
+        </div>
+        <div id="pdfAudioBox" class="pdf-audio-box hidden"></div>
+        <div class="pdf-layout">
+          <article class="pdf-viewer-card">
+            <div class="pdf-page-bar">
+              <button id="pdfPrevBtn" class="ghost-btn" type="button">上一页</button>
+              <span id="pdfPageLabel">未上传 PDF</span>
+              <button id="pdfNextBtn" class="ghost-btn" type="button">下一页</button>
+            </div>
+            <div class="pdf-canvas-toolbar" aria-label="PDF 网页刷题工具栏">
+              <button id="pdfViewOriginalBtn" class="ghost-btn active" type="button">原版 PDF</button>
+              <button id="pdfViewTextBtn" class="ghost-btn" type="button">文字题面</button>
+              <button id="pdfExtractTextBtn" class="ghost-btn" type="button">提取当前文字</button>
+              <button id="pdfOcrCurrentBtn" class="ghost-btn" type="button">OCR 当前页</button>
+              <button id="pdfOcrSegmentBtn" class="ghost-btn" type="button">OCR 当前片段</button>
+              <button id="pdfZoomOutBtn" class="ghost-btn" type="button">缩小</button>
+              <button id="pdfFitBtn" class="ghost-btn" type="button">适合宽度</button>
+              <button id="pdfZoomInBtn" class="ghost-btn" type="button">放大</button>
+              <button id="pdfFocusBtn" class="ghost-btn" type="button">专注刷题</button>
+            </div>
+            <div id="pdfCanvasShell" class="pdf-canvas-shell">
+              <canvas id="pdfCanvas" aria-label="PDF 网页刷题页面"></canvas>
+              <p id="pdfCanvasEmpty" class="empty">上传 PDF 后，这里会变成网页刷题页面，不再显示浏览器 PDF 工具栏。</p>
+            </div>
+            <div id="pdfTextShell" class="pdf-text-shell hidden" aria-label="PDF 文字刷题页面">
+              <p class="empty">点击“提取当前文字”，把当前 PDF 或当前片段变成网页文字题面。</p>
+            </div>
+            <div class="pdf-segment-builder" aria-label="PDF 切片刷题">
+              <div>
+                <strong>切成小套题</strong>
+                <span>把整本 PDF 按 Test / Passage / Section 分开刷，翻页只在片段内。</span>
+              </div>
+              <form id="pdfSegmentForm" class="pdf-segment-form" autocomplete="off">
+                <label>片段名称<input id="pdfSegmentTitle" type="text" placeholder="例如：Test 1 Reading Passage 1" required></label>
+                <label>起始页<input id="pdfSegmentStart" type="number" min="1" value="1" required></label>
+                <label>结束页<input id="pdfSegmentEnd" type="number" min="1" value="3" required></label>
+                <label>题量<input id="pdfSegmentQuestions" type="number" min="1" max="80" value="13" required></label>
+                <button type="submit">创建片段</button>
+                <button id="pdfAutoSegmentBtn" class="ghost-btn" type="button">自动切题</button>
+              </form>
+              <p id="pdfAutoSegmentHint" class="pdf-auto-segment-hint">不想手动填页码时，点“自动切题”，系统会按剑桥雅思常见 Test 结构先生成可刷片段。</p>
+              <div id="pdfSegmentList" class="pdf-segment-list"></div>
+            </div>
+          </article>
+          <article class="answer-sheet-card">
+            <h3>答题卡</h3>
+            <label>题号范围<input id="pdfQuestionCount" type="number" min="1" max="80" value="40"></label>
+            <button id="buildAnswerSheetBtn" class="pill-btn" type="button">生成答题卡</button>
+            <label>答案 Key（可选）<textarea id="answerKeyInput" rows="5" placeholder="支持：1.B\n2.TRUE\n3.atmosphere 或 B, TRUE, atmosphere"></textarea></label>
+            <div id="pdfAnswerSheet" class="pdf-answer-sheet"></div>
+            <div class="pdf-actions"><button id="gradePdfBtn" type="button">提交判分</button><button id="savePdfSessionBtn" class="ghost-btn" type="button">保存记录</button></div>
+            <div id="pdfResult" class="mock-result"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="vocab" class="panel vocab-panel app-view">
+        <div class="section-head">
+          <div>
+            <h2>背单词</h2>
+          </div>
+          <button id="seedWordsBtn" class="pill-btn" type="button">补充雅思核心词</button>
+        </div>
+        <div class="vocab-layout">
+          <article class="word-card momo-review-card" data-card-state="front">
+            <div class="word-meta"><span id="wordStage">Review</span><span id="wordDue">今日待复习 0</span></div>
+            <div class="review-progress"><span id="wordProgressBar"></span></div>
+            <div class="review-face review-front">
+              <small class="review-kicker">先回忆含义，再点开答案</small>
+              <h3 id="wordText">暂无待复习单词</h3>
+              <button id="showMeaningBtn" class="pill-btn reveal-btn" type="button">显示释义</button>
+            </div>
+            <div class="review-face review-back hidden">
+              <small class="review-kicker">释义 / 例句</small>
+              <p id="wordMeaning">添加单词或点击补充核心词后开始。</p>
+              <p id="wordExample" class="word-example"></p>
+            </div>
+            <div class="word-actions">
+              <button id="forgotWordBtn" type="button">不认识</button>
+              <button id="fuzzyWordBtn" class="ghost-btn" type="button">模糊</button>
+              <button id="knowWordBtn" class="ghost-btn" type="button">认识</button>
+            </div>
+          </article>
+        <div class="scribble-pad">
+          <div><strong>手写草稿纸</strong><span>一边写一边背，适合默写、造句、画同义词网络</span></div>
+          <canvas id="scribbleCanvas" width="900" height="360" aria-label="单词手写草稿纸"></canvas>
+          <div class="scribble-actions"><button id="clearScribbleBtn" class="ghost-btn" type="button">清空草稿纸</button></div>
+        </div>
+          <details class="word-form word-form-details">
+            <summary>手动添加自己的单词</summary>
+            <form id="wordForm" class="word-form-inner" autocomplete="off">
+              <label>单词<input id="newWord" type="text" placeholder="例如：allocate" required></label>
+              <label>中文含义<input id="newMeaning" type="text" placeholder="分配；拨出" required></label>
+              <label>例句<textarea id="newExample" rows="3" placeholder="The government should allocate more funding to public transport."></textarea></label>
+              <button type="submit">加入记忆曲线</button>
+            </form>
+          </details>
+        </div>
+
+
+        <div class="vocab-pdf-card vocab-module-board">
+          <div class="vocab-pdf-head">
+            <div><strong>List 模块背诵</strong><span id="vocabModuleSummary">按 List 勾选、标重点、加入记忆曲线</span></div>
+            <small id="vocabModuleCount">已提取 3633 个词</small>
+          </div>
+          <div id="vocabModuleTabs" class="vocab-module-tabs" aria-label="单词 List 模块"></div>
+          <div id="vocabModuleWords" class="vocab-module-words"></div>
+          <div class="vocab-pdf-grid vocab-pdf-links">
+            <a href="./pdf-assets/list1~10.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 1-10</a>
+            <a href="./pdf-assets/list11~16.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 11-16</a>
+            <a href="./pdf-assets/list17~27.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 17-27</a>
+            <a href="./pdf-assets/list28~37.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 28-37</a>
+            <a href="./pdf-assets/list38~47.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 38-47</a>
+            <a href="./pdf-assets/list48~56.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 48-56</a>
+            <a href="./pdf-assets/list57~63.pdf" target="_blank" rel="noopener noreferrer">原 PDF：List 57-63</a>
+            <a href="./pdf-assets/英译中.pdf" target="_blank" rel="noopener noreferrer">英译中</a>
+            <a href="./pdf-assets/中译英.pdf" target="_blank" rel="noopener noreferrer">中译英</a>
+          </div>
+        </div>
+
+        <div class="vocab-import-card">
+          <div><strong>导入自己的单词本</strong><span>支持 CSV / TXT / 粘贴：word | 中文 | example，自动去重并加入记忆曲线。</span></div>
+          <div class="vocab-import-grid">
+            <label class="file-import">上传单词本<input id="vocabImportFile" type="file" accept=".txt,.csv,text/plain,text/csv"></label>
+            <textarea id="vocabImportText" rows="6" placeholder="allocate | 分配；拨出 | Governments should allocate more funding.\nsignificant, 显著的, There was a significant increase."></textarea>
+            <button id="importVocabBtn" type="button">导入单词</button>
+          </div>
+          <p id="vocabImportStatus" class="muted">导入后会自动进入记忆曲线复习。</p>
+        </div>
+
+        <div id="wordList" class="word-list"></div>
+      </section>
+
+      <section id="wrongbook" class="panel wrongbook-panel app-view">
+        <div class="section-head"><div><h2>错题本</h2></div><button id="clearMasteredBtn" class="pill-btn" type="button">清理已掌握</button></div>
+        <div id="wrongbookList" class="wrongbook-list"></div>
+      </section>
+
+      <section id="output" class="panel output-panel app-view">
+        <div class="section-head"><div><h2>写作 / 口语</h2></div><button id="newPromptBtn" class="pill-btn" type="button">换一个题目</button></div>
+        <div class="output-grid">
+          <article class="prompt-card"><span id="outputType">Writing Task 2</span><h3 id="outputPrompt">Prompt</h3><p id="outputHint">Hint</p></article>
+          <form id="outputForm" class="output-form">
+            <label>练习类型<select id="outputMode"><option>Writing Task 2</option><option>Writing Task 1</option><option>Speaking Part 2</option><option>Speaking Part 3</option></select></label>
+            <label>你的答案 / 素材<textarea id="outputText" rows="9" placeholder="在这里写作文、列口语素材，或记录录音后的复盘。"></textarea></label>
+            <div class="output-stats"><span id="wordCounter">0 words</span><span id="outputSavedCount">0 条记录</span></div>
+            <div class="output-actions">
+              <button type="submit">保存输出记录</button>
+              <button id="aiMarkBtn" class="pill-btn" type="button">AI 批改</button>
+              <button id="aiPolishBtn" class="ghost-btn" type="button">生成高分改写</button>
+            </div>
+            <p class="ai-setup-note">AI Key 只放在 Vercel / Netlify 环境变量里，前端不会保存密钥。</p>
+          </form>
+        </div>
+        <article id="aiFeedbackPanel" class="ai-feedback-panel" aria-live="polite"></article>
+        <div id="outputHistory" class="output-history"></div>
+      </section>
+
+      <section id="resources" class="panel resources-panel app-view">
+        <div class="section-head"><div><h2>高分链接库</h2></div></div>
+        <form id="resourceForm" class="inline-form" autocomplete="off"><input id="resourceName" type="text" placeholder="课程 / 网站名称" required><select id="resourceType"><option>课程</option><option>官方</option><option>刷题</option><option>写作</option><option>口语</option><option>词汇</option></select><input id="resourceUrl" type="url" placeholder="https://" required><button type="submit">添加</button></form>
+        <div id="resourceGrid" class="resource-grid"></div>
+      </section>
+
+      <section id="plan" class="panel plan-panel app-view">
+        <div class="section-head"><div><h2>今日安排</h2></div><button id="loadTemplateBtn" class="pill-btn" type="button">载入高分日程模板</button></div>
+        <form id="taskForm" class="task-form" autocomplete="off"><input id="taskTitle" type="text" placeholder="例如：阅读错题二刷 + 解析复盘" required><select id="taskModule"><option>听力</option><option>阅读</option><option>写作</option><option>口语</option><option>词汇</option><option>复盘</option><option>模考</option></select><input id="taskMinutes" type="number" min="5" step="5" value="45" required><button type="submit">添加任务</button></form>
+        <div id="taskList" class="task-list"></div>
+      </section>
+
+      <section id="timer" class="timer-grid app-view">
+        <article class="panel focus-panel"><h2>专注倒计时</h2><div class="timer-display" id="timerDisplay">45:00</div><div class="timer-controls"><button class="pill-btn" data-minutes="25" type="button">25 分钟</button><button class="pill-btn" data-minutes="45" type="button">45 分钟</button><button class="pill-btn" data-minutes="60" type="button">60 分钟</button></div><div class="timer-actions"><button id="startTimerBtn" type="button">开始 / 暂停</button><button id="resetTimerBtn" class="ghost-btn" type="button">重置</button></div></article>
+        <article class="panel reminder-panel"><h2>每日提醒</h2><label>提醒时间<input id="reminderTime" type="time" value="20:30"></label><label>提醒文案<input id="reminderText" type="text" value="该交今日雅思打卡了：刷题 + 错题 + 输出记录"></label><button id="enableReminderBtn" type="button">开启浏览器提醒</button><p class="muted" id="reminderStatus">提醒将在当前浏览器本地运行。</p></article>
+        <article class="panel checkin-panel"><h2>今日打卡</h2><form id="checkinForm" class="checkin-form" autocomplete="off"><label>学习分钟<input id="checkinMinutes" type="number" min="0" step="5" value="120"></label><label>新增词汇<input id="checkinWords" type="number" min="0" step="1" value="30"></label><label>完成题数<input id="checkinQuestions" type="number" min="0" step="1" value="10"></label><label>证据备注<textarea id="checkinNote" rows="4" placeholder="今天刷了哪些题？错在哪里？明天二刷什么？"></textarea></label><button type="submit">提交打卡</button></form></article>
+      </section>
+
+      <section class="panel heatmap-panel dashboard-only"><div class="section-head"><div><h2>30 天热力图</h2></div><span class="db-badge" id="dbStatus">数据库连接中...</span></div><div id="heatmap" class="heatmap" aria-label="30天打卡热力图"></div></section>
+
+      <section class="panel install-panel dashboard-only">
+        <div class="section-head">
+          <div>
+            <h2>手机 / 平板打开</h2>
+          </div>
+          <button id="installBtn" class="pill-btn" type="button">安装到设备</button>
+        </div>
+        <div class="install-steps">
+          <article><strong>iPhone / iPad</strong><p>Safari 打开网站 → 分享 → 添加到主屏幕。</p></article>
+          <article><strong>Android / Chrome</strong><p>Chrome 打开网站 → 菜单 → 安装应用 / 添加到主屏幕。</p></article>
+          <article><strong>离线能力</strong><p>首次打开后会缓存核心文件，之后可更快启动。</p></article>
+        </div>
+      </section>
+
+      <section id="review" class="panel review-panel app-view"><div class="section-head"><div><h2>周复盘</h2></div><button id="exportBtn" class="pill-btn" type="button">导出备份 JSON</button></div><div class="review-grid"><label>本周最有效动作<textarea data-review="wins" rows="5" placeholder="例如：错题二刷比继续刷新题更有效。"></textarea></label><label>最明显失分点<textarea data-review="blockers" rows="5" placeholder="例如：定位词找到了，但同义替换没识别出来。"></textarea></label><label>下周调整<textarea data-review="next" rows="5" placeholder="例如：每晚二刷 5 道错题，作文每两天一篇。"></textarea></label></div><label class="file-import">导入备份 JSON<input id="importInput" type="file" accept="application/json"></label></section>
+    </main>
+  </div>
+
+  <template id="resourceTemplate"><article class="resource-card"><div><span></span><small></small></div><h3></h3><p></p><a target="_blank" rel="noopener noreferrer">打开资源</a><button class="delete-link" type="button">移除</button></article></template>
+  <template id="taskTemplate"><article class="task-item"><button class="task-toggle" type="button" aria-label="切换完成状态"></button><div><strong></strong><p></p></div><time></time><button class="delete-link" type="button">删除</button></article></template>
+  <template id="wrongTemplate"><article class="wrong-card"><div><span></span><small></small></div><h3></h3><p></p><strong></strong><button class="pill-btn" type="button">标记已掌握</button></article></template>
+
+  <template id="wordTemplate"><article class="mini-word"><strong></strong><span></span><small></small></article></template>
+
+  <script src="./pdf.min.js"></script>
+  <script src="./tesseract.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

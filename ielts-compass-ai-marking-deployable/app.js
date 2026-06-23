@@ -90,12 +90,13 @@ const defaultState = {
   reminder: { enabled: false, time: '20:30', text: '该交今日雅思打卡了：刷题 + 错题 + 输出记录' },
   practice: { attempts: [], wrongbook: [], currentSet: 'reading', currentIndex: 0 },
   mock: { attempts: [], currentTestId: fullTests[0]?.id || '', answers: {}, startedAt: null, remaining: 0, audioNames: {}, audioUrls: {}, audioRates: {} },
-  vocab: coreWords.slice(0, 6).map(createWordCard),
+  vocab: coreWords.slice(0, 6).map(createWordCard), pdfDrill: { fileName: '', fileUrl: '', page: 1, totalPages: 1, mode: 'reading', secondsLeft: 3600, running: false, answers: {}, sessions: [] },
   outputs: [],
   aiFeedback: null
 };
 
 let db, state = structuredClone(defaultState);
+let pdfInterval = null;
 let timerSeconds = 45 * 60, timerTotal = 45 * 60, timerInterval = null;
 let practiceSeconds = 0, practiceInterval = null, selectedAnswer = null, currentPromptIndex = 0, reminderInterval = null, mockInterval = null, deferredInstallPrompt = null, scribbleReady = false;
 const $ = selector => document.querySelector(selector);
@@ -112,10 +113,11 @@ function bindEvents() {
   $('#demoLogin').addEventListener('click', () => login({ name: 'Solo Runner', email: 'solo@ielts.local', band: 7.5, examDate: nextExamDate() }));
   $('#logoutBtn').addEventListener('click', async () => { state.user = null; await saveState(); render(); });
   $('#mobileMenuBtn').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
-  $$('.sidebar a').forEach(a => a.addEventListener('click', () => $('.sidebar').classList.remove('open')));
+  $$('.sidebar a, .home-actions a').forEach(a => a.addEventListener('click', () => { $('.sidebar')?.classList.remove('open'); setTimeout(showCurrentView, 0); }));
+  window.addEventListener('hashchange', showCurrentView);
   $$('[data-practice]').forEach(btn => btn.addEventListener('click', () => switchPractice(btn.dataset.practice)));
   $('#startPracticeBtn').addEventListener('click', togglePracticeTimer); $('#resetPracticeBtn').addEventListener('click', resetPractice); $('#submitAnswerBtn').addEventListener('click', submitAnswer); $('#nextQuestionBtn').addEventListener('click', nextQuestion); $('#clearMasteredBtn').addEventListener('click', clearMastered);
-  $('#startMockBtn').addEventListener('click', startMock); $('#submitMockBtn').addEventListener('click', submitMock); $('#mockSelect').addEventListener('change', async () => { state.mock.currentTestId = $('#mockSelect').value; state.mock.answers = {}; state.mock.startedAt = null; state.mock.remaining = 0; await saveState(); renderMock(); }); document.addEventListener('change', handleMockAudioChange); document.addEventListener('click', handleMockAudioClick);
+  $('#startMockBtn').addEventListener('click', startMock); $('#submitMockBtn').addEventListener('click', submitMock); document.addEventListener('click', handleMockControlClick); $('#mockSelect').addEventListener('change', async () => { state.mock.currentTestId = $('#mockSelect').value; state.mock.answers = {}; state.mock.startedAt = null; state.mock.remaining = 0; await saveState(); renderMock(); }); document.addEventListener('change', handleMockAudioChange); document.addEventListener('click', handleMockAudioClick);
   $('#newPromptBtn').addEventListener('click', () => { currentPromptIndex = (currentPromptIndex + 1) % outputPrompts.length; renderOutputPrompt(); });
   $('#wordForm').addEventListener('submit', addWord);
   $('#seedWordsBtn').addEventListener('click', seedMoreWords);
@@ -126,25 +128,200 @@ function bindEvents() {
   $('#outputMode').addEventListener('change', renderOutputPromptByMode); $('#outputText').addEventListener('input', updateWordCount); $('#outputForm').addEventListener('submit', saveOutput); $('#aiMarkBtn')?.addEventListener('click', markOutputWithAI); $('#aiMarkBtn').addEventListener('click', () => requestAIReview('mark')); $('#aiPolishBtn').addEventListener('click', () => requestAIReview('polish'));
   $('#resourceForm').addEventListener('submit', addResource); $('#taskForm').addEventListener('submit', addTask); $('#loadTemplateBtn').addEventListener('click', async () => { state.tasks = templateTasks.map(t => ({ ...t, id: crypto.randomUUID(), done: false })); await saveState(); renderTasks(); });
   $$('.timer-controls [data-minutes]').forEach(b => b.addEventListener('click', () => setTimer(Number(b.dataset.minutes)))); $('#startTimerBtn').addEventListener('click', toggleTimer); $('#resetTimerBtn').addEventListener('click', () => setTimer(Math.round(timerTotal / 60))); $('#enableReminderBtn').addEventListener('click', enableReminder); $('#checkinForm').addEventListener('submit', submitCheckin);
-  $$('[data-review]').forEach(t => t.addEventListener('input', async () => { state.review[t.dataset.review] = t.value; await saveState(); })); $('#exportBtn').addEventListener('click', exportJSON); $('#importInput').addEventListener('change', importJSON);
+  $$('[data-review]').forEach(t => t.addEventListener('input', async () => { state.review[t.dataset.review] = t.value; await saveState(); })); $('#exportBtn').addEventListener('click', exportJSON); $('#importInput').addEventListener('change', importJSON); bindPdfDrillEvents(); bindVocabImportEvents();
 }
+
+function bindPdfDrillEvents() {
+  $('#pdfInput')?.addEventListener('change', handlePdfUpload);
+  $('#pdfAudioInput')?.addEventListener('change', handlePdfAudioUpload);
+  $('#pdfPrevBtn')?.addEventListener('click', () => changePdfPage(-1));
+  $('#pdfNextBtn')?.addEventListener('click', () => changePdfPage(1));
+  $('#buildAnswerSheetBtn')?.addEventListener('click', buildPdfAnswerSheet);
+  $('#gradePdfBtn')?.addEventListener('click', gradePdfAnswers);
+  $('#savePdfSessionBtn')?.addEventListener('click', savePdfSession);
+  $('#pdfStartBtn')?.addEventListener('click', startPdfTimer);
+  $('#pdfPauseBtn')?.addEventListener('click', pausePdfTimer);
+  $('#pdfEndBtn')?.addEventListener('click', endPdfTimer);
+  $$('[data-pdf-mode]').forEach(btn => btn.addEventListener('click', () => setPdfMode(btn.dataset.pdfMode)));
+}
+function bindVocabImportEvents() {
+  $('#vocabImportFile')?.addEventListener('change', handleVocabFileImport);
+  $('#importVocabBtn')?.addEventListener('click', importVocabFromText);
+}
+function setPdfMode(mode) {
+  state.pdfDrill.mode = mode;
+  if (!state.pdfDrill.running) state.pdfDrill.secondsLeft = mode === 'listening' ? 1800 : mode === 'reading' ? 3600 : 2700;
+  $$('[data-pdf-mode]').forEach(btn => btn.classList.toggle('active', btn.dataset.pdfMode === mode));
+  renderPdfDrill();
+  saveState();
+}
+function renderPdfDrill() {
+  if (!$('#pdfTimer')) return;
+  const pdf = state.pdfDrill || defaultState.pdfDrill;
+  $('#pdfTimer').textContent = formatSeconds(pdf.secondsLeft || 0);
+  $('#pdfPageLabel').textContent = pdf.fileName ? `${pdf.fileName} · 第 ${pdf.page || 1} 页` : '未上传 PDF';
+  const frame = $('#pdfFrame');
+  if (frame && pdf.fileUrl) frame.src = `${pdf.fileUrl}#page=${pdf.page || 1}`;
+  buildPdfAnswerSheet(false);
+}
+async function handlePdfUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (file.type !== 'application/pdf') { alert('请上传 PDF 文件。'); return; }
+  if (state.pdfDrill.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(state.pdfDrill.fileUrl);
+  state.pdfDrill.fileName = file.name;
+  state.pdfDrill.fileUrl = URL.createObjectURL(file);
+  state.pdfDrill.page = 1;
+  await saveState();
+  renderPdfDrill();
+}
+function handlePdfAudioUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file || !file.type.startsWith('audio/')) return;
+  const url = URL.createObjectURL(file);
+  const box = $('#pdfAudioBox');
+  box.classList.remove('hidden');
+  box.innerHTML = `<strong>${escapeHTML(file.name)}</strong><audio controls preload="metadata" src="${url}"></audio>`;
+}
+async function changePdfPage(delta) {
+  state.pdfDrill.page = Math.max(1, (state.pdfDrill.page || 1) + delta);
+  await saveState();
+  renderPdfDrill();
+}
+function buildPdfAnswerSheet(reset = true) {
+  const box = $('#pdfAnswerSheet');
+  if (!box) return;
+  const count = Math.max(1, Math.min(80, Number($('#pdfQuestionCount')?.value || 40)));
+  if (reset) state.pdfDrill.answers = {};
+  box.innerHTML = Array.from({ length: count }, (_, i) => { const n = i + 1; const val = state.pdfDrill.answers?.[n] || ''; return `<label><span>${n}</span><input data-pdf-answer="${n}" value="${escapeHTML(val)}" placeholder="答案"></label>`; }).join('');
+  box.querySelectorAll('[data-pdf-answer]').forEach(input => input.addEventListener('input', async () => { state.pdfDrill.answers[input.dataset.pdfAnswer] = input.value.trim(); await saveState(); }));
+}
+function parseAnswerKey(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return {};
+  const lines = raw.includes('\n') ? raw.split(/\n+/) : raw.split(/,/);
+  const key = {};
+  lines.map(s => s.trim()).filter(Boolean).forEach((line, idx) => {
+    const match = line.match(/^(\d+)\s*[\.|\)|:|-]?\s*(.+)$/);
+    if (match) key[match[1]] = match[2].trim().toLowerCase(); else key[idx + 1] = line.trim().toLowerCase();
+  });
+  return key;
+}
+async function gradePdfAnswers() {
+  const key = parseAnswerKey($('#answerKeyInput').value);
+  const nums = Object.keys(key);
+  if (!nums.length) { $('#pdfResult').innerHTML = '<p class="empty">请先输入答案 Key，才能自动判分。</p>'; return; }
+  let correct = 0;
+  const details = nums.map(n => {
+    const user = (state.pdfDrill.answers?.[n] || '').trim().toLowerCase();
+    const ok = user && user === key[n];
+    if (ok) correct += 1;
+    return `<li class="${ok ? 'ok' : 'bad'}">第 ${n} 题：你的答案 ${escapeHTML(user || '未填')}；正确答案 ${escapeHTML(key[n])}</li>`;
+  }).join('');
+  const score = Math.round(correct / nums.length * 100);
+  $('#pdfResult').innerHTML = `<h3>PDF 刷题判分：${correct}/${nums.length} · ${score}%</h3><ol>${details}</ol>`;
+}
+async function savePdfSession() {
+  state.pdfDrill.sessions.unshift({ id: crypto.randomUUID(), fileName: state.pdfDrill.fileName || '未命名 PDF', date: new Date().toLocaleString(), answers: { ...(state.pdfDrill.answers || {}) } });
+  await saveState();
+  $('#pdfResult').innerHTML = '<p class="empty">本次 PDF 刷题记录已保存。</p>';
+}
+function startPdfTimer() {
+  clearInterval(pdfInterval);
+  state.pdfDrill.running = true;
+  pdfInterval = setInterval(async () => { state.pdfDrill.secondsLeft = Math.max(0, (state.pdfDrill.secondsLeft || 0) - 1); $('#pdfTimer').textContent = formatSeconds(state.pdfDrill.secondsLeft); if (state.pdfDrill.secondsLeft === 0) { clearInterval(pdfInterval); state.pdfDrill.running = false; await saveState(); } }, 1000);
+}
+async function pausePdfTimer() { clearInterval(pdfInterval); pdfInterval = null; state.pdfDrill.running = false; await saveState(); }
+async function endPdfTimer() { clearInterval(pdfInterval); pdfInterval = null; state.pdfDrill.running = false; state.pdfDrill.secondsLeft = state.pdfDrill.mode === 'listening' ? 1800 : state.pdfDrill.mode === 'reading' ? 3600 : 2700; await saveState(); renderPdfDrill(); }
+function parseVocabLines(text) {
+  return String(text || '').split(/\n+/).map(line => line.trim()).filter(Boolean).map(line => {
+    const parts = line.includes('|') ? line.split('|') : line.split(',');
+    return { word: (parts[0] || '').trim(), meaning: (parts[1] || '').trim(), example: (parts.slice(2).join(',') || '').trim() };
+  }).filter(x => x.word && x.meaning);
+}
+async function importVocabItems(items) {
+  const existing = new Set((state.vocab || []).map(w => w.word.toLowerCase()));
+  let added = 0;
+  items.forEach(item => { if (!existing.has(item.word.toLowerCase())) { state.vocab.push(createWordCard(item)); existing.add(item.word.toLowerCase()); added += 1; } });
+  await saveState();
+  renderVocab(); renderMetrics();
+  $('#vocabImportStatus').textContent = `已导入 ${added} 个新单词，重复项已自动跳过。`;
+}
+function handleVocabFileImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { $('#vocabImportText').value = reader.result; importVocabFromText(); };
+  reader.readAsText(file);
+}
+function importVocabFromText() { importVocabItems(parseVocabLines($('#vocabImportText').value)); }
+
 async function login(profile) { state.user = { name: profile.name, email: profile.email, createdAt: new Date().toISOString() }; state.target.overall = profile.band; state.target.examDate = profile.examDate || nextExamDate(); await saveState(); render(); }
-function render() { $('#authScreen').classList.toggle('hidden', Boolean(state.user)); $('#app').classList.toggle('hidden', !state.user); $('#loginExam').value = state.target.examDate || nextExamDate(); if (!state.user) return; renderUser(); renderMetrics(); renderPractice(); renderMockSelect(); renderMock(); renderVocab(); renderWrongbook(); renderOutputs(); renderOutputPrompt(); renderAIFeedback(); renderResources(); renderTasks(); renderHeatmap(); renderReview(); renderReminder(); renderTimer(); setupScribblePad(); registerServiceWorker(); }
+function render() { $('#authScreen').classList.toggle('hidden', Boolean(state.user)); $('#app').classList.toggle('hidden', !state.user); $('#loginExam').value = state.target.examDate || nextExamDate(); if (!state.user) return; renderUser(); renderMetrics(); renderPractice(); renderMockSelect(); renderMock(); renderPdfDrill(); renderVocab(); renderWrongbook(); renderOutputs(); renderOutputPrompt(); renderAIFeedback(); renderResources(); renderTasks(); renderHeatmap(); renderReview(); renderReminder(); renderTimer(); setupScribblePad(); showCurrentView(); registerServiceWorker(); }
+function showCurrentView() {
+  const allowed = ['dashboard', 'practice', 'exam', 'pdfdrill', 'vocab', 'wrongbook', 'output', 'resources', 'plan', 'timer', 'review'];
+  const requested = (location.hash || '#dashboard').replace('#', '').trim();
+  const view = allowed.includes(requested) ? requested : 'dashboard';
+  if (requested !== view) history.replaceState(null, '', `#${view}`);
+  $$('.app-view').forEach(section => section.classList.toggle('active-view', section.id === view));
+  $$('.dashboard-only').forEach(section => section.classList.remove('active-view'));
+  $$('.sidebar nav a').forEach(link => link.classList.toggle('active', link.getAttribute('href') === `#${view}`));
+  document.body.dataset.view = view;
+  if (state?.user) requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+}
 function renderUser() { $('#userName').textContent = state.user.name; $('#userEmail').textContent = `${state.user.email} · 单人本地版`; $('#userInitial').textContent = state.user.name.slice(0, 1).toUpperCase(); }
 function renderMetrics() { const attempts = state.practice.attempts || []; const correct = attempts.filter(a => a.correct).length; const accuracy = attempts.length ? Math.round(correct / attempts.length * 100) : 0; $('#accuracyRate').textContent = `${accuracy}%`; $('#accuracyBar').style.width = `${accuracy}%`; $('#wrongCount').textContent = (state.practice.wrongbook || []).filter(w => !w.mastered).length; $('#dueWordCount').textContent = getDueWords().length; $('#daysLeft').textContent = Math.max(0, Math.ceil((new Date(state.target.examDate) - startOfDay(new Date())) / 86400000)); $('#weeklyMinutes').textContent = recentCheckins(7).reduce((s, i) => s + Number(i.minutes || 0), 0); }
 function switchPractice(set) { state.practice.currentSet = set; state.practice.currentIndex = 0; selectedAnswer = null; $$('.chip[data-practice]').forEach(c => c.classList.toggle('active', c.dataset.practice === set)); resetPractice(false); renderPractice(); }
 function renderPractice() { const set = questionSets[state.practice.currentSet]; const q = set.questions[state.practice.currentIndex]; $('#practiceModule').textContent = set.module; $('#practiceTitle').textContent = set.title; $('#practicePassage').textContent = set.passage; $('#questionIndex').textContent = `${state.practice.currentIndex + 1} / ${set.questions.length}`; $('#questionType').textContent = q.type; $('#questionText').textContent = q.text; $('#answerFeedback').innerHTML = ''; selectedAnswer = null; const list = $('#optionList'); list.innerHTML = ''; q.options.forEach((option, index) => { const button = document.createElement('button'); button.type = 'button'; button.className = 'option-button'; button.textContent = `${String.fromCharCode(65 + index)}. ${option}`; button.addEventListener('click', () => { selectedAnswer = index; $$('.option-button').forEach(b => b.classList.remove('selected')); button.classList.add('selected'); }); list.appendChild(button); }); renderPracticeTimer(); }
 async function submitAnswer() { if (selectedAnswer === null) { $('#answerFeedback').innerHTML = '<p class="warn">请先选择一个答案。</p>'; return; } const set = questionSets[state.practice.currentSet]; const q = set.questions[state.practice.currentIndex]; const correct = selectedAnswer === q.answer; const attempt = { id: crypto.randomUUID(), date: toDateKey(new Date()), set: state.practice.currentSet, questionId: q.id, question: q.text, selected: q.options[selectedAnswer], answer: q.options[q.answer], explanation: q.explanation, correct }; state.practice.attempts.push(attempt); if (!correct && !state.practice.wrongbook.some(w => w.questionId === q.id && !w.mastered)) state.practice.wrongbook.unshift({ ...attempt, mastered: false }); await saveState(); $('#answerFeedback').innerHTML = `<p class="${correct ? 'ok' : 'bad'}">${correct ? '回答正确' : `回答错误，正确答案：${q.options[q.answer]}`}</p><p>${q.explanation}</p>`; renderMetrics(); renderWrongbook(); }
 function nextQuestion() { const set = questionSets[state.practice.currentSet]; state.practice.currentIndex = (state.practice.currentIndex + 1) % set.questions.length; selectedAnswer = null; renderPractice(); }
-function togglePracticeTimer() { if (practiceInterval) { clearInterval(practiceInterval); practiceInterval = null; return; } practiceInterval = setInterval(() => { practiceSeconds += 1; renderPracticeTimer(); }, 1000); }
-function resetPractice(renderNow = true) { clearInterval(practiceInterval); practiceInterval = null; practiceSeconds = 0; if (renderNow) renderPractice(); else renderPracticeTimer(); }
-function renderPracticeTimer() { $('#practiceTimer').textContent = formatSeconds(practiceSeconds); }
+function togglePracticeTimer() { if (practiceInterval) { clearInterval(practiceInterval); practiceInterval = null; $('#startPracticeBtn').textContent = '继续本组计时'; return; } $('#startPracticeBtn').textContent = practiceSeconds ? '暂停本组计时' : '暂停本组计时'; practiceInterval = setInterval(() => { practiceSeconds += 1; renderPracticeTimer(); }, 1000); }
+function resetPractice(renderNow = true) { clearInterval(practiceInterval); practiceInterval = null; practiceSeconds = 0; const btn = $('#startPracticeBtn'); if (btn) btn.textContent = '开始本组计时'; if (renderNow) renderPractice(); else renderPracticeTimer(); }
+function endPracticeSession() { clearInterval(practiceInterval); practiceInterval = null; practiceSeconds = 0; selectedAnswer = null; state.practice.currentIndex = 0; renderPractice(); $('#answerFeedback').innerHTML = '<p class="empty">已结束本组刷题，可以切换题型或重新开始。</p>'; }
+function renderPracticeTimer() { $('#practiceTimer').textContent = formatSeconds(practiceSeconds); const actions = document.querySelector('.practice-actions'); if (actions && !$('#endPracticeBtn')) { const end = document.createElement('button'); end.id = 'endPracticeBtn'; end.type = 'button'; end.className = 'text-btn'; end.textContent = '结束本组'; end.addEventListener('click', endPracticeSession); actions.appendChild(end); } }
 function renderWrongbook() { const list = $('#wrongbookList'); const wrongs = (state.practice.wrongbook || []).filter(w => !w.mastered); list.innerHTML = ''; if (!wrongs.length) { list.innerHTML = '<p class="empty">暂无错题。刷题答错后会自动进入这里。</p>'; return; } const template = $('#wrongTemplate'); wrongs.forEach(item => { const node = template.content.firstElementChild.cloneNode(true); node.querySelector('span').textContent = item.set; node.querySelector('small').textContent = item.date; node.querySelector('h3').textContent = item.question; node.querySelector('p').textContent = `你的答案：${item.selected}；正确答案：${item.answer}`; node.querySelector('strong').textContent = item.explanation; node.querySelector('button').addEventListener('click', async () => { item.mastered = true; await saveState(); renderWrongbook(); renderMetrics(); }); list.appendChild(node); }); }
 
 
 function renderMockSelect() { const select = $('#mockSelect'); if (!select || select.options.length) return; fullTests.forEach(test => { const option = document.createElement('option'); option.value = test.id; option.textContent = test.title; select.appendChild(option); }); if (!state.mock.currentTestId && fullTests[0]) state.mock.currentTestId = fullTests[0].id; select.value = state.mock.currentTestId; }
 function currentMock() { return fullTests.find(test => test.id === state.mock.currentTestId) || fullTests[0]; }
-function renderMock() { const test = currentMock(); const area = $('#mockArea'); if (!test) { area.innerHTML = '<p class="empty">暂无模拟题。</p>'; return; } $('#mockTimer').textContent = state.mock.remaining ? formatSeconds(state.mock.remaining) : `${test.minutes}:00`; area.innerHTML = `${renderListeningSection(test)}${renderReadingSection(test)}`; area.querySelectorAll('[data-mock-q]').forEach(input => { const key = input.dataset.mockQ; input.checked = state.mock.answers[key] === Number(input.value); input.addEventListener('change', async () => { state.mock.answers[key] = Number(input.value); await saveState(); }); }); }
+function renderMock() { const test = currentMock(); const area = $('#mockArea'); if (!test) { area.innerHTML = '<p class="empty">暂无模拟题。</p>'; return; } $('#mockTimer').textContent = state.mock.remaining ? formatSeconds(state.mock.remaining) : `${test.minutes}:00`; area.innerHTML = `${renderMockControls()}${renderListeningSection(test)}${renderReadingSection(test)}`; area.querySelectorAll('[data-mock-q]').forEach(input => { const key = input.dataset.mockQ; input.checked = state.mock.answers[key] === Number(input.value); input.addEventListener('change', async () => { state.mock.answers[key] = Number(input.value); await saveState(); }); }); }
+
+function renderMockControls() {
+  const active = Boolean(state.mock.startedAt && state.mock.remaining > 0);
+  const paused = Boolean(state.mock.paused);
+  return `<div class="mock-control-strip"><strong>${active ? (paused ? '模考已暂停' : '模考进行中') : '模考控制台'}</strong><div><button type="button" class="ghost-btn" data-mock-control="pause">${paused ? '继续模考' : '暂停模考'}</button><button type="button" class="text-btn" data-mock-control="end">结束/退出模考</button></div></div>`;
+}
+async function handleMockControlClick(event) {
+  const btn = event.target.closest('[data-mock-control]');
+  if (!btn) return;
+  const action = btn.dataset.mockControl;
+  if (action === 'pause') {
+    if (!state.mock.startedAt || state.mock.remaining <= 0) return;
+    if (state.mock.paused) {
+      state.mock.paused = false;
+      clearInterval(mockInterval);
+      mockInterval = setInterval(() => { state.mock.remaining = Math.max(0, state.mock.remaining - 1); $('#mockTimer').textContent = formatSeconds(state.mock.remaining); if (state.mock.remaining === 0) submitMock(); }, 1000);
+    } else {
+      state.mock.paused = true;
+      clearInterval(mockInterval);
+      mockInterval = null;
+    }
+    await saveState();
+    renderMock();
+  }
+  if (action === 'end') {
+    clearInterval(mockInterval);
+    mockInterval = null;
+    state.mock.paused = false;
+    state.mock.startedAt = null;
+    state.mock.remaining = 0;
+    state.mock.answers = {};
+    await saveState();
+    renderMock();
+    $('#mockResult').innerHTML = '<p class="empty">已结束本次模考，未计入成绩。可以重新选择套题开始。</p>';
+  }
+}
+
 function renderListeningSection(test) {
   const uploadedUrl = state.mock.audioUrls?.[test.id] || '';
   const uploadedName = state.mock.audioNames?.[test.id] || '';
@@ -195,7 +372,7 @@ async function handleMockAudioClick(event) {
 }
 
 window.speakMockScript = function speakMockScript() { const test = currentMock(); if (!('speechSynthesis' in window) || !test) { alert('当前浏览器不支持语音播放。'); return; } speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(test.listening.script.replace('Audio script:', '')); utterance.lang = 'en-US'; utterance.rate = 0.86; speechSynthesis.speak(utterance); };
-async function startMock() { const test = currentMock(); if (!test) return; state.mock.answers = {}; state.mock.startedAt = new Date().toISOString(); state.mock.remaining = test.minutes * 60; clearInterval(mockInterval); mockInterval = setInterval(() => { state.mock.remaining = Math.max(0, state.mock.remaining - 1); $('#mockTimer').textContent = formatSeconds(state.mock.remaining); if (state.mock.remaining === 0) submitMock(); }, 1000); await saveState(); renderMock(); $('#mockResult').innerHTML = '<p class="empty">考试已开始。请按真实考试状态完成听力和阅读。</p>'; }
+async function startMock() { const test = currentMock(); if (!test) return; state.mock.answers = {}; state.mock.startedAt = new Date().toISOString(); state.mock.remaining = test.minutes * 60; state.mock.paused = false; clearInterval(mockInterval); mockInterval = setInterval(() => { state.mock.remaining = Math.max(0, state.mock.remaining - 1); $('#mockTimer').textContent = formatSeconds(state.mock.remaining); if (state.mock.remaining === 0) submitMock(); }, 1000); await saveState(); renderMock(); $('#mockResult').innerHTML = '<p class="empty">考试已开始。可以暂停、继续或结束本次模考。</p>'; }
 async function submitMock() { const test = currentMock(); if (!test) return; clearInterval(mockInterval); mockInterval = null; const all = [...test.listening.questions, ...test.reading.questions]; let correct = 0; const details = all.map(q => { const chosen = state.mock.answers[q.id]; const ok = chosen === q.answer; if (ok) correct += 1; return `<li class="${ok ? 'ok' : 'bad'}"><strong>${escapeHTML(q.text)}</strong><br>你的答案：${chosen === undefined ? '未作答' : escapeHTML(q.options[chosen])}；正确答案：${escapeHTML(q.options[q.answer])}<br>${escapeHTML(q.explanation)}</li>`; }).join(''); const score = Math.round(correct / all.length * 100); state.mock.attempts.unshift({ id: crypto.randomUUID(), date: new Date().toLocaleString(), testId: test.id, correct, total: all.length, score }); await saveState(); $('#mockResult').innerHTML = `<h3>自动判分：${correct}/${all.length} · ${score}%</h3><p>${estimateBand(score)}</p><ol>${details}</ol>`; }
 function estimateBand(score) { if (score >= 90) return '估算表现：Band 8.0–9.0 区间。'; if (score >= 75) return '估算表现：Band 7.0–7.5 区间。'; if (score >= 60) return '估算表现：Band 6.0–6.5 区间。'; return '估算表现：Band 5.5 或以下，需要集中复盘错题。'; }
 function setupScribblePad() { if (scribbleReady) return; const canvas = $('#scribbleCanvas'); if (!canvas) return; const ctx = canvas.getContext('2d'); ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = '#2d2118'; let drawing = false; const pos = event => { const rect = canvas.getBoundingClientRect(); const point = event.touches ? event.touches[0] : event; return { x: (point.clientX - rect.left) * (canvas.width / rect.width), y: (point.clientY - rect.top) * (canvas.height / rect.height) }; }; const start = event => { drawing = true; const p = pos(event); ctx.beginPath(); ctx.moveTo(p.x, p.y); event.preventDefault(); }; const move = event => { if (!drawing) return; const p = pos(event); ctx.lineTo(p.x, p.y); ctx.stroke(); event.preventDefault(); }; const end = () => { drawing = false; }; canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end); canvas.addEventListener('touchstart', start, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); canvas.addEventListener('touchend', end); scribbleReady = true; }

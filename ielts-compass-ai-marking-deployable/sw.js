@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ielts-compass-auto-slice-v24';
+const CACHE_NAME = 'ielts-compass-layout-fix-v25';
 const ASSETS = [
   './',
   './index.html',

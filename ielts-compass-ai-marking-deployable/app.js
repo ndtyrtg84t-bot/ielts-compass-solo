@@ -156,6 +156,7 @@ function bindPdfDrillEvents() {
   $('#pdfZoomOutBtn')?.addEventListener('click', () => zoomPdf(-0.15));
   $('#pdfZoomInBtn')?.addEventListener('click', () => zoomPdf(0.15));
   $('#pdfFitBtn')?.addEventListener('click', fitPdfWidth);
+  $('#pdfFocusBtn')?.addEventListener('click', togglePdfFocusMode);
   $('#buildAnswerSheetBtn')?.addEventListener('click', buildPdfAnswerSheet);
   $('#gradePdfBtn')?.addEventListener('click', gradePdfAnswers);
   $('#savePdfSessionBtn')?.addEventListener('click', savePdfSession);
@@ -222,12 +223,12 @@ async function loadPdfFileIntoState(file) {
 async function ensurePdfDocument(force = false) {
   const empty = $('#pdfCanvasEmpty');
   if (!state.pdfDrill?.pdfData || !window.pdfjsLib) {
-    if (empty && state.pdfDrill?.fileName) empty.textContent = 'PDF.js 暂时没有加载成功，请检查网络后刷新页面。';
+    if (empty && state.pdfDrill?.fileName) empty.textContent = 'PDF 渲染器没有加载成功。请确认 pdf.min.js 和 pdf.worker.min.js 已一起上传到 GitHub。';
     return null;
   }
   if (pdfDoc && !force) return pdfDoc;
   if (window.pdfjsLib?.GlobalWorkerOptions) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
   }
   const data = dataUrlToUint8Array(state.pdfDrill.pdfData);
   if (!data) return null;
@@ -271,6 +272,13 @@ async function renderPdfPage() {
   try { await pdfRenderTask.promise; } catch (_) {}
   pdfRenderTask = null;
   $('#pdfPageLabel').textContent = `${state.pdfDrill.fileName} · 第 ${pageNo}/${doc.numPages} 页`;
+}
+
+function togglePdfFocusMode() {
+  const panel = $('#pdfdrill');
+  panel?.classList.toggle('pdf-focus-mode');
+  $('#pdfFocusBtn').textContent = panel?.classList.contains('pdf-focus-mode') ? '退出专注' : '专注刷题';
+  setTimeout(() => fitPdfWidth(), 80);
 }
 async function zoomPdf(delta) {
   pdfFitMode = false;

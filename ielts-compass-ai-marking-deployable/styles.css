@@ -555,3 +555,17 @@ body { font-size: clamp(16px, .95vw, 18px); }
 @media (max-width: 900px) { .test-bundle-form, .bulk-bundle-form { grid-template-columns: 1fr; } .test-bundle-card, .test-import-card > div:first-child { display: grid; } .test-bundle-actions { justify-content: start; } }
 
 .folder-bundle-form { grid-template-columns: 1fr auto; background: color-mix(in oklch, var(--paper), transparent 18%); padding: 10px; border-radius: 14px; }
+
+
+/* v20: IELTS-style PDF web drill */
+.pdf-panel .pdf-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); align-items: start; }
+.pdf-viewer-card { position: relative; }
+.answer-sheet-card { position: sticky; top: 18px; max-height: calc(100vh - 36px); overflow: auto; }
+.pdf-canvas-toolbar button, .pdf-page-bar button { min-height: 42px; }
+.pdf-canvas-shell { overscroll-behavior: contain; }
+.pdf-focus-mode .test-import-card, .pdf-focus-mode .pdf-toolbar, .pdf-focus-mode .pdf-mode-tabs { display: none !important; }
+.pdf-focus-mode { padding-top: 18px; }
+.pdf-focus-mode .pdf-layout { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); }
+.pdf-focus-mode .pdf-viewer-card, .pdf-focus-mode .answer-sheet-card { box-shadow: 4px 4px 0 var(--ink); }
+@media (max-width: 1040px) { .answer-sheet-card { position: static; max-height: none; } }
+@media (max-width: 680px) { .pdf-panel .pdf-layout, .pdf-focus-mode .pdf-layout { grid-template-columns: 1fr; } .answer-sheet-card { order: 2; } .pdf-viewer-card { order: 1; } }

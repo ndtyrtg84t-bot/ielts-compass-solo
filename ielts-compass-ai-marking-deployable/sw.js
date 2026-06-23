@@ -1,9 +1,11 @@
-const CACHE_NAME = 'ielts-compass-pdf-canvas-v19';
+const CACHE_NAME = 'ielts-compass-pdf-local-v20';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './pdf.min.js',
+  './pdf.worker.min.js',
   './vocab-data.js',
   './user-vocab-modules.js',
   './user-vocab-data.js',

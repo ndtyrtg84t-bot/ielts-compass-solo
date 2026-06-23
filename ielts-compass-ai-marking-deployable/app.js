@@ -103,6 +103,7 @@ const defaultState = {
 
 let db, state = structuredClone(defaultState);
 let activeVocabModuleId = vocabModules[0]?.id || '';
+let vocabAnswerVisible = false;
 let pdfInterval = null;
 let timerSeconds = 45 * 60, timerTotal = 45 * 60, timerInterval = null;
 let practiceSeconds = 0, practiceInterval = null, selectedAnswer = null, currentPromptIndex = 0, reminderInterval = null, mockInterval = null, deferredInstallPrompt = null, scribbleReady = false;
@@ -132,8 +133,10 @@ function bindEvents() {
   $('#clearScribbleBtn').addEventListener('click', clearScribblePad);
   $('#vocabModuleTabs')?.addEventListener('click', handleVocabModuleTabClick);
   $('#vocabModuleWords')?.addEventListener('click', handleVocabModuleWordClick);
-  $('#forgotWordBtn').addEventListener('click', () => reviewWord(false));
-  $('#knowWordBtn').addEventListener('click', () => reviewWord(true));
+  $('#showMeaningBtn')?.addEventListener('click', showWordAnswer);
+  $('#forgotWordBtn').addEventListener('click', () => reviewWord('forgot'));
+  $('#fuzzyWordBtn')?.addEventListener('click', () => reviewWord('fuzzy'));
+  $('#knowWordBtn').addEventListener('click', () => reviewWord('known'));
   $('#installBtn').addEventListener('click', installApp);
   $('#outputMode').addEventListener('change', renderOutputPromptByMode); $('#outputText').addEventListener('input', updateWordCount); $('#outputForm').addEventListener('submit', saveOutput); $('#aiMarkBtn')?.addEventListener('click', markOutputWithAI); $('#aiMarkBtn').addEventListener('click', () => requestAIReview('mark')); $('#aiPolishBtn').addEventListener('click', () => requestAIReview('polish'));
   $('#resourceForm').addEventListener('submit', addResource); $('#taskForm').addEventListener('submit', addTask); $('#loadTemplateBtn').addEventListener('click', async () => { state.tasks = templateTasks.map(t => ({ ...t, id: crypto.randomUUID(), done: false })); await saveState(); renderTasks(); });
@@ -146,6 +149,7 @@ function bindPdfDrillEvents() {
   $('#pdfAudioInput')?.addEventListener('change', handlePdfAudioUpload);
   $('#testBundleForm')?.addEventListener('submit', createTestBundle);
   $('#bulkBundleForm')?.addEventListener('submit', createBulkTestBundles);
+  $('#folderBundleForm')?.addEventListener('submit', attachAudioFoldersToBundles);
   $('#testBundleList')?.addEventListener('click', handleTestBundleClick);
   $('#pdfPrevBtn')?.addEventListener('click', () => changePdfPage(-1));
   $('#pdfNextBtn')?.addEventListener('click', () => changePdfPage(1));
@@ -273,15 +277,49 @@ async function createTestBundle(event) {
   loadTestBundle(bundle.id);
 }
 
+function extractBookNumber(name) {
+  const raw = String(name || '');
+  const path = raw.replace(/\\/g, '/');
+  const firstFolder = path.includes('/') ? path.split('/').find(Boolean) : '';
+  const text = `${firstFolder} ${path}`.toLowerCase();
+  const patterns = [
+    /(?:剑桥雅思真题|剑桥雅思|剑|cambridge|c)\s*[\[【(（]?\s*(\d{1,2})\s*[\]】)）]?/i,
+    /[\[【(（]\s*(\d{1,2})\s*[\]】)）]/,
+    /(?:book|vol|册|真题)\s*(\d{1,2})/i,
+    /(?:^|[\s_\-\/])(?:c)?(\d{1,2})(?=[\s_\-\/]|$)/i
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && Number(match[1]) >= 1 && Number(match[1]) <= 30) return String(Number(match[1]));
+  }
+  return '';
+}
+function extractBookNumber(name) {
+  const raw = String(name || '');
+  const path = raw.replace(/\\/g, '/');
+  const firstFolder = path.includes('/') ? path.split('/').find(Boolean) : '';
+  const text = `${firstFolder} ${path}`.toLowerCase();
+  const patterns = [
+    /(?:剑桥雅思真题|剑桥雅思|剑|cambridge|c)\s*[\[【(（]?\s*(\d{1,2})\s*[\]】)）]?/i,
+    /[\[【(（]\s*(\d{1,2})\s*[\]】)）]/,
+    /(?:book|vol|册|真题)\s*(\d{1,2})/i,
+    /(?:^|[\s_\-\/])(?:c)?(\d{1,2})(?=[\s_\-\/]|$)/i
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && Number(match[1]) >= 1 && Number(match[1]) <= 30) return String(Number(match[1]));
+  }
+  return '';
+}
 function normalizeBundleKey(name) {
+  const book = extractBookNumber(name);
+  if (book) return `book-${book}`;
   let base = String(name || '').replace(/\.[^.]+$/i, '').toLowerCase();
   base = base.replace(/[【】\[\]()（）{}]/g, ' ').replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim();
   const cam = base.match(/(?:cambridge|剑桥|c)\s*(\d{1,2})\s*(?:test|t|套题)?\s*(\d{1,2})/i);
   if (cam) return `cambridge-${cam[1]}-test-${cam[2]}`;
   const test = base.match(/(?:test|t|套题|真题|practice test)\s*(\d{1,2})/i);
   if (test) return `test-${test[1]}`;
-  const bookTest = base.match(/(\d{1,2})\s*(?:test|t)\s*(\d{1,2})/i);
-  if (bookTest) return `book-${bookTest[1]}-test-${bookTest[2]}`;
   return base.replace(/\b(section|part|audio|listening|reading|questions?|answer|key|track|cd)\b/gi, '').replace(/\b\d{1,2}\b/g, '').replace(/\s+/g, ' ').trim() || base;
 }
 function audioSortScore(file) {
@@ -291,34 +329,49 @@ function audioSortScore(file) {
   const nums = name.match(/\d{1,2}/g);
   return nums ? Number(nums[nums.length - 1]) : 99;
 }
+
+function filesToAudioGroups(files, usePath = false) {
+  const audioGroups = new Map();
+  files.filter(file => file.type.startsWith('audio/')).forEach(file => {
+    const key = normalizeBundleKey(usePath ? (file.webkitRelativePath || file.name) : file.name);
+    if (!audioGroups.has(key)) audioGroups.set(key, []);
+    audioGroups.get(key).push(file);
+  });
+  return audioGroups;
+}
+function matchAudioForPdf(pdfFile, audioGroups) {
+  const key = normalizeBundleKey(pdfFile.name);
+  let tracks = audioGroups.get(key) || [];
+  if (!tracks.length) {
+    const book = extractBookNumber(pdfFile.name);
+    if (book) tracks = audioGroups.get(`book-${book}`) || [];
+  }
+  if (!tracks.length) {
+    const fuzzy = Array.from(audioGroups.entries()).find(([audioKey]) => audioKey.includes(key) || key.includes(audioKey));
+    if (fuzzy) tracks = fuzzy[1];
+  }
+  return tracks.slice().sort((a, b) => audioSortScore(a) - audioSortScore(b));
+}
+function createBundleFromFiles(pdfFile, tracks) {
+  return {
+    id: crypto.randomUUID(),
+    title: pdfFile.name.replace(/\.pdf$/i, ''),
+    pdfName: pdfFile.name,
+    pdfUrl: URL.createObjectURL(pdfFile),
+    audioTracks: tracks.map(file => ({ id: crypto.randomUUID(), name: file.name, path: file.webkitRelativePath || file.name, url: URL.createObjectURL(file) })),
+    createdAt: new Date().toLocaleString(),
+    lastPage: 1,
+    questionCount: 40,
+    groupKey: normalizeBundleKey(pdfFile.name),
+  };
+}
 async function createBulkTestBundles(event) {
   event.preventDefault();
   const pdfFiles = Array.from($('#bulkBundlePdf')?.files || []).filter(file => file.type === 'application/pdf');
   const audioFiles = Array.from($('#bulkBundleAudio')?.files || []).filter(file => file.type.startsWith('audio/'));
   if (!pdfFiles.length) { alert('请先批量选择 PDF。'); return; }
-  const audioGroups = new Map();
-  audioFiles.forEach(file => { const key = normalizeBundleKey(file.name); if (!audioGroups.has(key)) audioGroups.set(key, []); audioGroups.get(key).push(file); });
-  const bundles = pdfFiles.map(pdfFile => {
-    const key = normalizeBundleKey(pdfFile.name);
-    let tracks = audioGroups.get(key) || [];
-    if (!tracks.length && pdfFiles.length === 1) tracks = audioFiles;
-    if (!tracks.length) {
-      const fuzzy = Array.from(audioGroups.entries()).find(([audioKey]) => audioKey.includes(key) || key.includes(audioKey));
-      if (fuzzy) tracks = fuzzy[1];
-    }
-    tracks = tracks.slice().sort((a, b) => audioSortScore(a) - audioSortScore(b));
-    return {
-      id: crypto.randomUUID(),
-      title: pdfFile.name.replace(/\.pdf$/i, ''),
-      pdfName: pdfFile.name,
-      pdfUrl: URL.createObjectURL(pdfFile),
-      audioTracks: tracks.map(file => ({ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file) })),
-      createdAt: new Date().toLocaleString(),
-      lastPage: 1,
-      questionCount: 40,
-      groupKey: key,
-    };
-  });
+  const audioGroups = filesToAudioGroups(audioFiles, false);
+  const bundles = pdfFiles.map(pdfFile => createBundleFromFiles(pdfFile, pdfFiles.length === 1 ? audioFiles : matchAudioForPdf(pdfFile, audioGroups)));
   state.testBundles.unshift(...bundles);
   event.currentTarget.reset();
   await saveState();
@@ -326,6 +379,31 @@ async function createBulkTestBundles(event) {
   const matched = bundles.filter(bundle => bundle.audioTracks.length).length;
   $('#bulkBundleStatus').textContent = `已生成 ${bundles.length} 套题，其中 ${matched} 套自动匹配到音频。`;
   if (bundles[0]) await loadTestBundle(bundles[0].id);
+}
+async function attachAudioFoldersToBundles(event) {
+  event.preventDefault();
+  const files = Array.from($('#folderBundleAudio')?.files || []).filter(file => file.type.startsWith('audio/'));
+  if (!files.length) { alert('请先选择音频总文件夹。'); return; }
+  const audioGroups = filesToAudioGroups(files, true);
+  let matched = 0;
+  (state.testBundles || []).forEach(bundle => {
+    const key = normalizeBundleKey(bundle.pdfName || bundle.title);
+    let tracks = audioGroups.get(key) || [];
+    if (!tracks.length) {
+      const book = extractBookNumber(bundle.pdfName || bundle.title);
+      if (book) tracks = audioGroups.get(`book-${book}`) || [];
+    }
+    if (tracks.length) {
+      (bundle.audioTracks || []).forEach(track => { if (track.url?.startsWith('blob:')) URL.revokeObjectURL(track.url); });
+      bundle.audioTracks = tracks.slice().sort((a, b) => audioSortScore(a) - audioSortScore(b)).map(file => ({ id: crypto.randomUUID(), name: file.name, path: file.webkitRelativePath || file.name, url: URL.createObjectURL(file) }));
+      matched += 1;
+    }
+  });
+  event.currentTarget.reset();
+  await saveState();
+  renderTestBundles();
+  renderPdfDrill();
+  $('#bulkBundleStatus').textContent = `已从文件夹匹配 ${matched} 套题音频。`;
 }
 function renderTestBundles() {
   const list = $('#testBundleList'); if (!list) return;
@@ -516,10 +594,60 @@ function clearScribblePad() { const canvas = $('#scribbleCanvas'); if (!canvas) 
 function createWordCard(item) { const today = toDateKey(new Date()); return { id: crypto.randomUUID(), word: item.word, meaning: item.meaning, example: item.example || '', stage: 0, due: today, correctCount: 0, missCount: 0, createdAt: today }; }
 function getDueWords() { const today = toDateKey(new Date()); return (state.vocab || []).filter(w => w.due <= today); }
 function currentDueWord() { return getDueWords()[0] || null; }
-function renderVocab() { const due = getDueWords(); const word = due[0]; $('#wordDue').textContent = `今日待复习 ${due.length}`; if (!word) { $('#wordStage').textContent = 'Done'; $('#wordText').textContent = '今天的单词已完成'; $('#wordMeaning').textContent = '可以添加新词，或明天按记忆曲线继续复习。'; $('#wordExample').textContent = ''; } else { $('#wordStage').textContent = `第 ${word.stage + 1} 轮 · 间隔 ${MEMORY_STEPS[word.stage] || 30} 天`; $('#wordText').textContent = word.word; $('#wordMeaning').textContent = word.meaning; $('#wordExample').textContent = word.example ? `例句：${word.example}` : ''; } renderWordList(); renderVocabModules(); }
-async function addWord(event) { event.preventDefault(); state.vocab.unshift(createWordCard({ word: $('#newWord').value.trim(), meaning: $('#newMeaning').value.trim(), example: $('#newExample').value.trim() })); event.currentTarget.reset(); await saveState(); renderVocab(); renderMetrics(); }
-async function seedMoreWords() { const existing = new Set((state.vocab || []).map(w => w.word.toLowerCase())); coreWords.filter(w => !existing.has(w.word.toLowerCase())).forEach(w => state.vocab.push(createWordCard(w))); await saveState(); renderVocab(); renderMetrics(); }
-async function reviewWord(known) { const word = currentDueWord(); if (!word) return; if (known) { word.correctCount += 1; word.stage = Math.min(word.stage + 1, MEMORY_STEPS.length - 1); } else { word.missCount += 1; word.stage = 1; } const next = new Date(); next.setDate(next.getDate() + (known ? MEMORY_STEPS[word.stage] : 1)); word.due = toDateKey(next); await saveState(); renderVocab(); renderMetrics(); }
+function setAnswerVisible(visible) {
+  vocabAnswerVisible = visible;
+  const card = $('.momo-review-card');
+  card?.setAttribute('data-card-state', visible ? 'back' : 'front');
+  $('.review-front')?.classList.toggle('hidden', visible);
+  $('.review-back')?.classList.toggle('hidden', !visible);
+}
+function showWordAnswer() { if (currentDueWord()) setAnswerVisible(true); }
+function renderVocab() {
+  const due = getDueWords();
+  const word = due[0];
+  const total = Math.max(1, (state.vocab || []).length);
+  const todayDone = Math.max(0, total - due.length);
+  $('#wordDue').textContent = `今日待复习 ${due.length}`;
+  $('#wordProgressBar').style.width = `${Math.min(100, Math.round(todayDone / total * 100))}%`;
+  if (!word) {
+    $('#wordStage').textContent = 'Done';
+    $('#wordText').textContent = '今天的单词已完成';
+    $('#wordMeaning').textContent = '可以选择下面任意 List，点击“背这组”后立刻进入背诵。';
+    $('#wordExample').textContent = '';
+    setAnswerVisible(true);
+  } else {
+    $('#wordStage').textContent = `第 ${word.stage + 1} 轮 · ${MEMORY_STEPS[word.stage] || 30} 天后复现`;
+    $('#wordText').textContent = word.word;
+    $('#wordMeaning').textContent = word.meaning;
+    $('#wordExample').textContent = word.example ? `例句：${word.example}` : '';
+    setAnswerVisible(vocabAnswerVisible);
+  }
+  renderWordList();
+  renderVocabModules();
+}
+async function addWord(event) { event.preventDefault(); state.vocab.unshift(createWordCard({ word: $('#newWord').value.trim(), meaning: $('#newMeaning').value.trim(), example: $('#newExample').value.trim() })); event.currentTarget.reset(); vocabAnswerVisible = false; await saveState(); renderVocab(); renderMetrics(); }
+async function seedMoreWords() { const existing = new Set((state.vocab || []).map(w => w.word.toLowerCase())); coreWords.filter(w => !existing.has(w.word.toLowerCase())).forEach(w => state.vocab.push(createWordCard(w))); vocabAnswerVisible = false; await saveState(); renderVocab(); renderMetrics(); }
+async function reviewWord(result) {
+  const word = currentDueWord(); if (!word) return;
+  const mode = result === true ? 'known' : result === false ? 'forgot' : result;
+  const next = new Date();
+  if (mode === 'known') {
+    word.correctCount += 1;
+    word.stage = Math.min(word.stage + 1, MEMORY_STEPS.length - 1);
+    next.setDate(next.getDate() + (MEMORY_STEPS[word.stage] || 30));
+  } else if (mode === 'fuzzy') {
+    word.missCount += 1;
+    word.stage = Math.max(1, Math.min(word.stage, 2));
+    next.setDate(next.getDate() + 1);
+  } else {
+    word.missCount += 1;
+    word.stage = 0;
+    next.setDate(next.getDate());
+  }
+  word.due = toDateKey(next);
+  vocabAnswerVisible = false;
+  await saveState(); renderVocab(); renderMetrics();
+}
 function renderWordList() { const list = $('#wordList'); const template = $('#wordTemplate'); list.innerHTML = ''; (state.vocab || []).slice().sort((a, b) => a.due.localeCompare(b.due)).slice(0, 12).forEach(word => { const node = template.content.firstElementChild.cloneNode(true); node.querySelector('strong').textContent = word.word; node.querySelector('span').textContent = word.meaning; node.querySelector('small').textContent = `下次：${word.due} · 第 ${word.stage + 1} 轮`; list.appendChild(node); }); }
 function moduleProgress(moduleId, wordNumber) { const key = String(wordNumber); const bucket = state.vocabModuleProgress[moduleId] || {}; return bucket[key] || {}; }
 function renderVocabModules() {
@@ -530,7 +658,7 @@ function renderVocabModules() {
   const total = vocabModules.reduce((sum, module) => sum + module.words.length, 0);
   const doneTotal = vocabModules.reduce((sum, module) => sum + module.words.filter(word => moduleProgress(module.id, word.number).done).length, 0);
   $('#vocabModuleCount').textContent = `已提取 ${total} 个词`;
-  $('#vocabModuleSummary').textContent = `已勾选 ${doneTotal}/${total} · 点词卡标重点`;
+  $('#vocabModuleSummary').textContent = `已勾选 ${doneTotal}/${total} · 点 List 可选组，点词卡可单个背`;
   tabs.innerHTML = vocabModules.map(module => {
     const done = module.words.filter(word => moduleProgress(module.id, word.number).done).length;
     return `<button type="button" class="${module.id === activeVocabModuleId ? 'active' : ''}" data-vocab-module="${module.id}"><span>${escapeHTML(module.title)}</span><small>${done}/${module.count}</small></button>`;
@@ -538,11 +666,11 @@ function renderVocabModules() {
   const module = vocabModules.find(item => item.id === activeVocabModuleId) || vocabModules[0];
   const done = module.words.filter(word => moduleProgress(module.id, word.number).done).length;
   const starred = module.words.filter(word => moduleProgress(module.id, word.number).star).length;
-  box.innerHTML = `<div class="vocab-module-toolbar"><div><strong>${escapeHTML(module.title)}</strong><span>${escapeHTML(module.chapter)} · ${done}/${module.count} 已勾选 · ${starred} 个重点</span></div><button type="button" data-vocab-module-add="${module.id}">整组加入记忆曲线</button></div><div class="module-word-grid">${module.words.map(word => renderModuleWord(module.id, word)).join('')}</div>`;
+  box.innerHTML = `<div class="vocab-module-toolbar"><div><strong>${escapeHTML(module.title)}</strong><span>${escapeHTML(module.chapter)} · ${done}/${module.count} 已勾选 · ${starred} 个重点</span></div><button type="button" data-vocab-module-add="${module.id}">背这组</button></div><div class="module-word-grid">${module.words.map(word => renderModuleWord(module.id, word)).join('')}</div>`;
 }
 function renderModuleWord(moduleId, word) {
   const progress = moduleProgress(moduleId, word.number);
-  return `<article class="module-word ${progress.done ? 'is-done' : ''} ${progress.star ? 'is-starred' : ''}" data-module-word="${moduleId}" data-word-number="${word.number}"><button type="button" class="word-check" data-module-done="${moduleId}" data-word-number="${word.number}" aria-label="勾选 ${escapeHTML(word.word)}">${progress.done ? '✓' : ''}</button><div><strong>${word.number}. ${escapeHTML(word.word)}</strong><span>${escapeHTML(word.meaning)}</span><small>${escapeHTML(word.example || '')}</small></div><button type="button" class="word-star" data-module-star="${moduleId}" data-word-number="${word.number}" aria-label="标重点">${progress.star ? '★' : '☆'}</button><button type="button" class="word-add" data-module-add-word="${moduleId}" data-word-number="${word.number}">加入曲线</button></article>`;
+  return `<article class="module-word ${progress.done ? 'is-done' : ''} ${progress.star ? 'is-starred' : ''}" data-module-word="${moduleId}" data-word-number="${word.number}" title="点击词卡可直接开始背这个词"><button type="button" class="word-check" data-module-done="${moduleId}" data-word-number="${word.number}" aria-label="勾选 ${escapeHTML(word.word)}">${progress.done ? '✓' : ''}</button><div><strong>${word.number}. ${escapeHTML(word.word)}</strong><span>${escapeHTML(word.meaning)}</span><small>${escapeHTML(word.example || '')}</small></div><button type="button" class="word-star" data-module-star="${moduleId}" data-word-number="${word.number}" aria-label="标重点">${progress.star ? '★' : '☆'}</button><button type="button" class="word-add" data-module-add-word="${moduleId}" data-word-number="${word.number}">背这个</button></article>`;
 }
 function handleVocabModuleTabClick(event) { const target = event.target.closest('[data-vocab-module]'); if (!target) return; activeVocabModuleId = target.dataset.vocabModule; renderVocabModules(); }
 async function handleVocabModuleWordClick(event) {
@@ -550,10 +678,12 @@ async function handleVocabModuleWordClick(event) {
   const starBtn = event.target.closest('[data-module-star]');
   const addWordBtn = event.target.closest('[data-module-add-word]');
   const addModuleBtn = event.target.closest('[data-vocab-module-add]');
+  const wordCard = event.target.closest('[data-module-word]');
   if (doneBtn) { updateModuleProgress(doneBtn.dataset.moduleDone, doneBtn.dataset.wordNumber, 'done'); await saveState(); renderVocabModules(); return; }
   if (starBtn) { updateModuleProgress(starBtn.dataset.moduleStar, starBtn.dataset.wordNumber, 'star'); await saveState(); renderVocabModules(); return; }
   if (addWordBtn) { await addModuleWordsToMemory(addWordBtn.dataset.moduleAddWord, addWordBtn.dataset.wordNumber); return; }
-  if (addModuleBtn) { await addModuleWordsToMemory(addModuleBtn.dataset.vocabModuleAdd); }
+  if (addModuleBtn) { await addModuleWordsToMemory(addModuleBtn.dataset.vocabModuleAdd); return; }
+  if (wordCard) { await addModuleWordsToMemory(wordCard.dataset.moduleWord, wordCard.dataset.wordNumber); }
 }
 function updateModuleProgress(moduleId, wordNumber, field) {
   if (!state.vocabModuleProgress[moduleId]) state.vocabModuleProgress[moduleId] = {};
@@ -563,11 +693,27 @@ function updateModuleProgress(moduleId, wordNumber, field) {
 async function addModuleWordsToMemory(moduleId, wordNumber = null) {
   const module = vocabModules.find(item => item.id === moduleId); if (!module) return;
   const words = wordNumber ? module.words.filter(word => String(word.number) === String(wordNumber)) : module.words;
-  const existing = new Set((state.vocab || []).map(item => String(item.word || '').toLowerCase()));
+  if (!words.length) return;
+  const today = toDateKey(new Date());
+  const keyOf = item => String(item.word || '').trim().toLowerCase();
+  const selectedKeys = new Set(words.map(keyOf).filter(Boolean));
+  const existingByKey = new Map((state.vocab || []).map(item => [keyOf(item), item]));
   let added = 0;
-  words.forEach(word => { const key = String(word.word || '').toLowerCase(); if (key && !existing.has(key)) { state.vocab.push(createWordCard(word)); existing.add(key); added += 1; } });
+  const focusQueue = words.map(word => {
+    const key = keyOf(word);
+    const card = existingByKey.get(key) || createWordCard(word);
+    if (!existingByKey.has(key)) added += 1;
+    card.word = card.word || word.word;
+    card.meaning = card.meaning || word.meaning;
+    card.example = card.example || word.example || '';
+    card.stage = 0;
+    card.due = today;
+    return card;
+  });
+  state.vocab = [...focusQueue, ...(state.vocab || []).filter(item => !selectedKeys.has(keyOf(item)))];
+  vocabAnswerVisible = false;
   await saveState(); renderVocab(); renderMetrics();
-  alert(added ? `已加入 ${added} 个词到记忆曲线。` : '这些词已经在记忆曲线里了。');
+  alert(wordNumber ? '已放到当前背诵卡片。' : `已把 ${words.length} 个词放到背诵队列最前面。${added ? `新增 ${added} 个。` : ''}`);
 }
 
 function installApp() { if (window.deferredInstallPrompt) { window.deferredInstallPrompt.prompt(); return; } alert('如果浏览器没有弹出安装按钮：iPhone/iPad 用 Safari 分享 → 添加到主屏幕；Android/Chrome 用菜单 → 安装应用或添加到主屏幕。'); }

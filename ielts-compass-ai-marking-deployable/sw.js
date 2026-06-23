@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ielts-compass-bulk-bundle-v14';
+const CACHE_NAME = 'ielts-compass-momo-vocab-v17';
 const ASSETS = [
   './',
   './index.html',

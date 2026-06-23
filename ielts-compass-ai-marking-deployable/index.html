@@ -160,7 +160,11 @@
             <label class="file-import">批量选择音频<input id="bulkBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" multiple></label>
             <button type="submit">自动分组导入</button>
           </form>
-          <p id="bulkBundleStatus" class="muted">文件名里含有同样的 Test 编号、套题编号或 Cambridge 编号时，会自动归到一组。</p>
+          <form id="folderBundleForm" class="bulk-bundle-form folder-bundle-form">
+            <label class="file-import">选择音频总文件夹<input id="folderBundleAudio" type="file" accept="audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/wav,audio/ogg" webkitdirectory directory multiple></label>
+            <button type="submit">按文件夹匹配音频</button>
+          </form>
+          <p id="bulkBundleStatus" class="muted">PDF 可以批量选；音频可以批量选文件，也可以选择“音频4-19”总文件夹。系统会按 剑4 /【4】/Cambridge 4 / 真题4 自动配对。</p>
           <div id="testBundleList" class="test-bundle-list"></div>
         </div>
         <div class="pdf-toolbar">
@@ -198,22 +202,34 @@
           <button id="seedWordsBtn" class="pill-btn" type="button">补充雅思核心词</button>
         </div>
         <div class="vocab-layout">
-          <article class="word-card">
+          <article class="word-card momo-review-card" data-card-state="front">
             <div class="word-meta"><span id="wordStage">Review</span><span id="wordDue">今日待复习 0</span></div>
-            <h3 id="wordText">暂无待复习单词</h3>
-            <p id="wordMeaning">添加单词或点击补充核心词后开始。</p>
-            <p id="wordExample" class="word-example"></p>
+            <div class="review-progress"><span id="wordProgressBar"></span></div>
+            <div class="review-face review-front">
+              <small class="review-kicker">先回忆含义，再点开答案</small>
+              <h3 id="wordText">暂无待复习单词</h3>
+              <button id="showMeaningBtn" class="pill-btn reveal-btn" type="button">显示释义</button>
+            </div>
+            <div class="review-face review-back hidden">
+              <small class="review-kicker">释义 / 例句</small>
+              <p id="wordMeaning">添加单词或点击补充核心词后开始。</p>
+              <p id="wordExample" class="word-example"></p>
+            </div>
             <div class="word-actions">
-              <button id="forgotWordBtn" type="button">不认识，明天再来</button>
-              <button id="knowWordBtn" class="ghost-btn" type="button">认识，进入下一轮</button>
+              <button id="forgotWordBtn" type="button">不认识</button>
+              <button id="fuzzyWordBtn" class="ghost-btn" type="button">模糊</button>
+              <button id="knowWordBtn" class="ghost-btn" type="button">认识</button>
             </div>
           </article>
-          <form id="wordForm" class="word-form" autocomplete="off">
-            <label>单词<input id="newWord" type="text" placeholder="例如：allocate" required></label>
-            <label>中文含义<input id="newMeaning" type="text" placeholder="分配；拨出" required></label>
-            <label>例句<textarea id="newExample" rows="4" placeholder="The government should allocate more funding to public transport."></textarea></label>
-            <button type="submit">加入记忆曲线</button>
-          </form>
+          <details class="word-form word-form-details">
+            <summary>手动添加自己的单词</summary>
+            <form id="wordForm" class="word-form-inner" autocomplete="off">
+              <label>单词<input id="newWord" type="text" placeholder="例如：allocate" required></label>
+              <label>中文含义<input id="newMeaning" type="text" placeholder="分配；拨出" required></label>
+              <label>例句<textarea id="newExample" rows="3" placeholder="The government should allocate more funding to public transport."></textarea></label>
+              <button type="submit">加入记忆曲线</button>
+            </form>
+          </details>
         </div>
 
 

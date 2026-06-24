@@ -357,6 +357,7 @@ function bindPdfDrillEvents() {
   $('#pdfViewOriginalBtn')?.addEventListener('click', () => setPdfViewMode('pdf'));
   $('#pdfViewTextBtn')?.addEventListener('click', () => setPdfViewMode('text'));
   $('#pdfExtractTextBtn')?.addEventListener('click', extractCurrentPdfText);
+  $('#pdfWebPracticeBtn')?.addEventListener('click', convertCurrentPdfToWebPractice);
   $('#pdfOcrCurrentBtn')?.addEventListener('click', () => ocrCurrentPdf(false));
   $('#pdfOcrSegmentBtn')?.addEventListener('click', () => ocrCurrentPdf(true));
   $('#buildAnswerSheetBtn')?.addEventListener('click', buildPdfAnswerSheet);
@@ -421,13 +422,31 @@ function dataUrlToUint8Array(dataUrl) {
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
+function builtInPdfUrlCandidates(source) {
+  const urls = [];
+  const push = value => { if (value && !urls.includes(value)) urls.push(value); };
+  push(source);
+  push(String(source || '').replace(/】(?=剑桥)/g, '】 '));
+  push(String(source || '').replace(/】\s+(?=剑桥)/g, '】'));
+  return urls;
+}
 async function pdfSourceToUint8Array() {
   if (state.pdfDrill?.pdfData) return dataUrlToUint8Array(state.pdfDrill.pdfData);
   const source = state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl;
   if (!source) return null;
-  const response = await fetch(source, { cache: 'force-cache' });
-  if (!response.ok) throw new Error('内置 PDF 没有加载成功');
-  return new Uint8Array(await response.arrayBuffer());
+  let lastError = null;
+  for (const url of builtInPdfUrlCandidates(source)) {
+    try {
+      const response = await fetch(url, { cache: 'reload' });
+      if (!response.ok) { lastError = new Error(`HTTP ${response.status}: ${url}`); continue; }
+      state.pdfDrill.pdfSourceUrl = url;
+      state.pdfDrill.fileUrl = url;
+      return new Uint8Array(await response.arrayBuffer());
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`内置 PDF 没有加载成功。请检查 GitHub/Netlify 里是否存在这个文件：${source}${lastError ? `（${lastError.message || lastError}）` : ''}`);
 }
 async function loadPdfFileIntoState(file) {
   if (state.pdfDrill.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(state.pdfDrill.fileUrl);
@@ -473,7 +492,9 @@ async function ensurePdfDocument(force = false) {
     state.pdfDrill.page = Math.min(Math.max(1, state.pdfDrill.page || 1), state.pdfDrill.totalPages);
     return pdfDoc;
   } catch (error) {
-    if (empty) empty.textContent = '这个 PDF 暂时无法网页化渲染，可以重新上传或换浏览器试试。';
+    console.error('PDF load failed:', error);
+    if (empty) empty.textContent = error.message || '这个 PDF 暂时无法网页化渲染，可以重新上传或换浏览器试试。';
+    state.pdfDrill.importNotice = error.message || '这个 PDF 暂时无法网页化渲染，可以重新上传或换浏览器试试。';
     return null;
   }
 }
@@ -510,15 +531,64 @@ function setCachedPdfText(pageNo, text, source = 'text') {
 function normalizePdfTextItems(items) {
   const rows = [];
   (items || []).forEach(item => {
-    const str = String(item.str || '').trim();
-    if (!str) return;
-    const y = Math.round((item.transform?.[5] || 0) / 3) * 3;
-    const x = item.transform?.[4] || 0;
-    let row = rows.find(entry => Math.abs(entry.y - y) <= 2);
-    if (!row) { row = { y, parts: [] }; rows.push(row); }
-    row.parts.push({ x, str });
+    const text = String(item.str || '').replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    const tx = item.transform || [1, 0, 0, 1, 0, 0];
+    const x = Number(tx[4] || 0);
+    const y = Number(tx[5] || 0);
+    const height = Math.max(Math.abs(Number(tx[3] || 0)), Number(item.height || 0), 8);
+    const row = rows.find(line => Math.abs(line.y - y) <= Math.max(2.8, height * 0.42));
+    const token = { text, x, y, width: Number(item.width || 0), height };
+    if (row) {
+      row.items.push(token);
+      row.y = (row.y * (row.items.length - 1) + y) / row.items.length;
+      row.height = Math.max(row.height, height);
+    } else {
+      rows.push({ y, height, items: [token] });
+    }
   });
-  return rows.sort((a, b) => b.y - a.y).map(row => row.parts.sort((a, b) => a.x - b.x).map(part => part.str).join(' ').replace(/\s+([,.;:?!])/g, '$1')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const lines = rows
+    .sort((a, b) => b.y - a.y)
+    .map(row => {
+      const parts = row.items.sort((a, b) => a.x - b.x);
+      let line = '';
+      let lastRight = null;
+      parts.forEach(part => {
+        const gap = lastRight === null ? 0 : part.x - lastRight;
+        if (line && gap > Math.max(5, row.height * 0.65)) line += ' ';
+        line += part.text;
+        lastRight = part.x + (part.width || Math.max(part.text.length * row.height * 0.45, row.height));
+      });
+      return line.replace(/\s+([,.;:?!])/g, '$1').trim();
+    })
+    .filter(Boolean);
+  return lines
+    .join('\n')
+    .replace(/-\n(?=[a-z])/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+function enhanceOcrCanvas(sourceCanvas) {
+  const scale = 1.35;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(sourceCanvas.width * scale));
+  canvas.height = Math.max(1, Math.round(sourceCanvas.height * scale));
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(sourceCanvas, 0, 0, canvas.width, canvas.height);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = image.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const boosted = gray < 172 ? Math.max(0, gray * 0.72) : Math.min(255, 245 + (gray - 172) * 0.14);
+    data[i] = boosted;
+    data[i + 1] = boosted;
+    data[i + 2] = boosted;
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
 }
 async function extractPdfPageText(pageNo) {
   const cached = getCachedPdfText(pageNo);
@@ -549,7 +619,7 @@ async function ensureOcrWorker() {
     }
   });
   await pdfOcrWorker.setParameters({
-    tessedit_pageseg_mode: '6',
+    tessedit_pageseg_mode: '4',
     preserve_interword_spaces: '1'
   });
   return pdfOcrWorker;
@@ -558,15 +628,18 @@ async function renderPdfPageForOcr(pageNo) {
   const doc = await ensurePdfDocument(false);
   if (!doc) return null;
   const page = await doc.getPage(pageNo);
-  const viewport = page.getViewport({ scale: 2.2 });
+  const baseViewport = page.getViewport({ scale: 1 });
+  const maxSide = 3600;
+  const scale = Math.min(3.2, Math.max(2.4, maxSide / Math.max(baseViewport.width, baseViewport.height)));
+  const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { willReadFrequently: true });
   canvas.width = Math.floor(viewport.width);
   canvas.height = Math.floor(viewport.height);
-  context.fillStyle = '#fff';
+  context.fillStyle = '#ffffff';
   context.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvasContext: context, viewport }).promise;
-  return canvas;
+  return enhanceOcrCanvas(canvas);
 }
 function cleanOcrText(text) {
   return String(text || '')
@@ -593,7 +666,7 @@ async function ocrCurrentPdf(useSegment = false) {
   const start = segment ? segment.startPage : (state.pdfDrill.page || 1);
   const end = segment ? segment.endPage : (state.pdfDrill.page || 1);
   state.pdfDrill.viewMode = 'text';
-  if (shell) shell.innerHTML = `<div class="pdf-ocr-working"><strong>正在 OCR 识别</strong><span id="pdfOcrStatus">准备识别第 ${start}-${end} 页……</span><small>扫描版 PDF 识别会慢一点，建议先切成 Passage / Section 再 OCR。</small></div>`;
+  if (shell) shell.innerHTML = `<div class="pdf-ocr-working"><strong>正在 OCR 识别</strong><span id="pdfOcrStatus">准备识别第 ${start}-${end} 页……</span><small>新版会先高清渲染并增强对比度，再识别；扫描歪斜或阴影很重的页仍建议先按 Passage / Section 小范围 OCR。</small></div>`;
   try {
     for (let pageNo = start; pageNo <= end; pageNo += 1) {
       const status = $('#pdfOcrStatus');
@@ -609,7 +682,7 @@ async function ocrCurrentPdf(useSegment = false) {
   }
 }
 async function extractCurrentPdfText() {
-  if (!state.pdfDrill?.fileName || !state.pdfDrill?.pdfData) { alert('先上传或加载 PDF。'); return; }
+  if (!state.pdfDrill?.fileName || !(state.pdfDrill?.pdfData || state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl)) { alert('先上传或加载 PDF。'); return; }
   const shell = $('#pdfTextShell');
   const segment = activePdfSegment();
   const start = segment ? segment.startPage : (state.pdfDrill.page || 1);
@@ -622,6 +695,54 @@ async function extractCurrentPdfText() {
   await saveState();
   renderPdfViewMode();
 }
+
+function classifyPdfLine(line) {
+  const value = String(line || '').trim();
+  if (!value) return 'blank';
+  if (/^(section|part|test|reading passage|passage|questions?|writing task|listening)\b/i.test(value)) return 'heading';
+  if (/^\d+\s*[\).:-]/.test(value) || /^Questions?\s+\d+/i.test(value)) return 'question';
+  if (/^[A-D]\s*[\).:-]/.test(value)) return 'option';
+  return 'text';
+}
+function renderWebPracticeText(text, title, pageNo) {
+  const lines = String(text || '').split(/\n+/).map(line => line.trim()).filter(Boolean);
+  if (!lines.length) return '<p class="empty">这一页还没有可转换的文字。请先点 OCR 当前页或 OCR 当前片段。</p>';
+  return `<article class="web-practice-page"><div class="web-practice-head"><span>${escapeHTML(title || '网页做题')}</span><strong>Page ${pageNo}</strong></div>${lines.map(line => {
+    const type = classifyPdfLine(line);
+    if (type === 'heading') return `<h4>${escapeHTML(line)}</h4>`;
+    if (type === 'question') return `<div class="web-question-line"><b>${escapeHTML(line.match(/^\d+/)?.[0] || 'Q')}</b><span>${escapeHTML(line)}</span></div>`;
+    if (type === 'option') return `<label class="web-option-line"><input type="radio" disabled><span>${escapeHTML(line)}</span></label>`;
+    return `<p>${escapeHTML(line)}</p>`;
+  }).join('')}</article>`;
+}
+async function convertCurrentPdfToWebPractice() {
+  if (!state.pdfDrill?.fileName || !(state.pdfDrill?.pdfData || state.pdfDrill?.pdfSourceUrl || state.pdfDrill?.fileUrl)) { alert('先加载一本 PDF，再转换成网页做题。'); return; }
+  const shell = $('#pdfTextShell');
+  const segment = activePdfSegment();
+  const start = segment ? segment.startPage : (state.pdfDrill.page || 1);
+  const end = segment ? segment.endPage : (state.pdfDrill.page || 1);
+  state.pdfDrill.viewMode = 'text';
+  if (shell) shell.innerHTML = `<div class="pdf-ocr-working"><strong>正在转换成网页做题</strong><span id="pdfWebPracticeStatus">正在读取第 ${start}-${end} 页……</span><small>会优先用 PDF 自带文字层；扫描版会自动走 OCR。转换后右侧答题卡继续可用。</small></div>`;
+  try {
+    for (let pageNo = start; pageNo <= end; pageNo += 1) {
+      const status = $('#pdfWebPracticeStatus');
+      if (status) status.textContent = `正在转换第 ${pageNo}/${end} 页……`;
+      await extractPdfPageText(pageNo);
+    }
+    const activeBundle = (state.testBundles || []).find(item => item.id === state.pdfDrill.activeBundleId);
+    if (activeBundle) {
+      activeBundle.pageTexts = state.pdfDrill.pageTexts || {};
+      activeBundle.segmentTexts = state.pdfDrill.segmentTexts || {};
+      activeBundle.ocrTexts = state.pdfDrill.ocrTexts || {};
+      activeBundle.viewMode = 'text';
+    }
+    await saveState();
+    renderPdfViewMode();
+    document.querySelector('.pdf-text-shell')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (error) {
+    if (shell) shell.innerHTML = `<div class="pdf-text-empty"><strong>转换失败</strong><span>${escapeHTML(error.message || '这页文字识别失败，可以先用原版 PDF 做题。')}</span></div>`;
+  }
+}
 function renderPdfTextPage() {
   const shell = $('#pdfTextShell');
   if (!shell) return;
@@ -629,15 +750,14 @@ function renderPdfTextPage() {
   const text = getCachedPdfText(pageNo);
   const segment = activePdfSegment();
   if (!state.pdfDrill?.fileName) {
-    shell.innerHTML = '<p class="empty">先上传 PDF，再提取文字题面。</p>';
+    shell.innerHTML = '<p class="empty">先加载 PDF，再转成网页做题。</p>';
     return;
   }
   if (!text) {
-    shell.innerHTML = `<div class="pdf-text-empty"><strong>这一页还没有文字题面</strong><span>${segment ? '点击“提取当前文字”，会把当前片段全部转成网页文字。' : '点击“提取当前文字”，会把当前页转成网页文字。'}</span><button type="button" onclick="extractCurrentPdfText()">提取当前文字</button></div>`;
+    shell.innerHTML = `<div class="pdf-text-empty"><strong>这一页还没有网页题面</strong><span>${segment ? '点击“转成网页做题”，会把当前片段转换成网页题面。' : '点击“转成网页做题”，会把当前页转换成网页题面。'}</span><button type="button" onclick="convertCurrentPdfToWebPractice()">转成网页做题</button></div>`;
     return;
   }
-  const paragraphs = text.split(/\n{2,}|\n/).map(line => line.trim()).filter(Boolean);
-  shell.innerHTML = `<article class="pdf-text-page"><div class="pdf-text-page-head"><span>${escapeHTML(segment?.title || state.pdfDrill.fileName || 'PDF')}</span><strong>Page ${pageNo}</strong></div>${paragraphs.map(line => `<p>${escapeHTML(line)}</p>`).join('')}</article>`;
+  shell.innerHTML = renderWebPracticeText(text, segment?.title || state.pdfDrill.fileName || 'PDF', pageNo);
 }
 async function renderPdfPage() {
   const canvas = $('#pdfCanvas');
@@ -1123,38 +1243,65 @@ function renderBuiltInPdfBooks() {
 async function handleBuiltInPdfClick(event) {
   const auto = event.target.closest('[data-auto-built-in-pdf]');
   const load = event.target.closest('[data-load-built-in-pdf]');
-  if (auto) { await loadBuiltInPdfBook(auto.dataset.autoBuiltInPdf, true); return; }
-  if (load) { await loadBuiltInPdfBook(load.dataset.loadBuiltInPdf, false); }
+  const button = auto || load;
+  if (!button) return;
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = '加载中…';
+  try {
+    if (auto) { await loadBuiltInPdfBook(auto.dataset.autoBuiltInPdf, true); return; }
+    if (load) { await loadBuiltInPdfBook(load.dataset.loadBuiltInPdf, false); }
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
 }
 async function loadBuiltInPdfBook(bookId, autoSlice = false) {
   const book = builtInPdfBooks.find(item => item.id === bookId);
   if (!book) return;
-  if (state.pdfDrill.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(state.pdfDrill.fileUrl);
-  state.pdfDrill.builtInBookId = book.id;
-  state.pdfDrill.activeBundleId = '';
-  state.pdfDrill.fileName = book.title;
-  state.pdfDrill.fileUrl = book.url;
-  state.pdfDrill.pdfSourceUrl = book.url;
-  state.pdfDrill.pdfData = null;
-  state.pdfDrill.page = 1;
-  state.pdfDrill.totalPages = 1;
-  state.pdfDrill.activeSegmentId = '';
-  state.pdfDrill.segments = [];
-  state.pdfDrill.segmentAnswers = {};
-  state.pdfDrill.answers = {};
-  state.pdfDrill.pageTexts = {};
-  state.pdfDrill.segmentTexts = {};
-  state.pdfDrill.ocrTexts = {};
-  state.pdfDrill.ocrProgress = '';
-  state.pdfDrill.audioTracks = [];
-  state.pdfDrill.viewMode = 'pdf';
-  state.pdfDrill.importNotice = '已从私人真题本加载；PDF 不写入浏览器数据库，避免大文件保存失败。';
-  pdfDoc = null;
-  await ensurePdfDocument(true);
-  if ($('#pdfQuestionCount')) $('#pdfQuestionCount').value = book.questionCount || 40;
-  if (autoSlice || book.autoSlice) await autoCreatePdfSegments();
-  await saveState();
-  renderPdfDrill();
+  const empty = $('#pdfCanvasEmpty');
+  const hint = $('#pdfAutoSegmentHint');
+  if (empty) empty.textContent = `正在加载 ${book.title}……如果 PDF 较大，请等几秒。`;
+  if (hint) hint.textContent = `正在加载 ${book.title}……`;
+  try {
+    if (state.pdfDrill.fileUrl?.startsWith('blob:')) URL.revokeObjectURL(state.pdfDrill.fileUrl);
+    state.pdfDrill.builtInBookId = book.id;
+    state.pdfDrill.activeBundleId = '';
+    state.pdfDrill.fileName = book.title;
+    state.pdfDrill.fileUrl = book.url;
+    state.pdfDrill.pdfSourceUrl = book.url;
+    state.pdfDrill.pdfData = null;
+    state.pdfDrill.page = 1;
+    state.pdfDrill.totalPages = 1;
+    state.pdfDrill.activeSegmentId = '';
+    state.pdfDrill.segments = [];
+    state.pdfDrill.segmentAnswers = {};
+    state.pdfDrill.answers = {};
+    state.pdfDrill.pageTexts = {};
+    state.pdfDrill.segmentTexts = {};
+    state.pdfDrill.ocrTexts = {};
+    state.pdfDrill.ocrProgress = '';
+    state.pdfDrill.audioTracks = [];
+    state.pdfDrill.viewMode = 'pdf';
+    state.pdfDrill.importNotice = `正在从私人真题本加载 ${book.title}……`;
+    renderPdfDrill();
+    pdfDoc = null;
+    const doc = await ensurePdfDocument(true);
+    if (!doc) throw new Error(state.pdfDrill.importNotice || 'PDF 没有加载成功。');
+    state.pdfDrill.importNotice = `已加载 ${book.title}，共 ${state.pdfDrill.totalPages || doc.numPages || '?'} 页。`;
+    if ($('#pdfQuestionCount')) $('#pdfQuestionCount').value = book.questionCount || 40;
+    if (autoSlice || book.autoSlice) await autoCreatePdfSegments();
+    await saveState();
+    renderPdfDrill();
+    document.querySelector('.pdf-viewer-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (error) {
+    const message = error.message || 'PDF 没有加载成功。请检查 user-pdfs 文件夹、文件名和 Netlify 发布目录。';
+    state.pdfDrill.importNotice = message;
+    if (empty) empty.textContent = message;
+    if (hint) hint.textContent = message;
+    renderPdfDrill();
+    alert(`${book.title} 加载失败：${message}`);
+  }
 }
 function renderTestBundles() {
   const list = $('#testBundleList'); if (!list) return;

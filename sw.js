@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ielts-compass-built-in-pdfs-v28';
+const CACHE_NAME = 'ielts-compass-built-in-pdfs-v32';
 const ASSETS = [
   './',
   './index.html',

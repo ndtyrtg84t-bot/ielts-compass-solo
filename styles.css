@@ -701,3 +701,40 @@ body { font-size: clamp(16px, .95vw, 18px); }
 /* v28: built-in Cambridge 4-19 bank + listening matching guidance */
 .test-import-card .muted { padding: 10px 12px; border: 1px dashed var(--ink); border-radius: 14px; background: color-mix(in oklch, var(--paper), var(--gold) 12%); font-weight: 760; line-height: 1.55; }
 .built-in-pdf-card strong { font-size: 1.02rem; }
+
+
+/* v30: clearer OCR/text extraction feedback */
+.pdf-ocr-working small { display: block; margin-top: 6px; line-height: 1.55; color: var(--muted); font-weight: 760; }
+.pdf-text-shell { line-height: 1.72; }
+.pdf-text-page pre { white-space: pre-wrap; word-break: normal; overflow-wrap: anywhere; }
+
+
+/* v31: PDF to web-practice mode */
+.web-practice-page { display: grid; gap: 13px; padding: clamp(14px, 2vw, 22px); border: 2px solid var(--ink); border-radius: 20px; background: color-mix(in oklch, var(--paper), white 20%); box-shadow: 4px 4px 0 var(--ink); }
+.web-practice-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding-bottom: 10px; border-bottom: 1.5px dashed var(--ink); font-weight: 900; }
+.web-practice-head span { overflow-wrap: anywhere; }
+.web-practice-page h4 { margin: 12px 0 2px; font-size: clamp(1.05rem, 1.5vw, 1.28rem); letter-spacing: -.02em; }
+.web-practice-page p { margin: 0; font-weight: 650; line-height: 1.72; }
+.web-question-line { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 12px; border: 1.5px solid var(--ink); border-radius: 14px; background: color-mix(in oklch, var(--gold), var(--paper) 72%); }
+.web-question-line b { min-width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 999px; border: 1.5px solid var(--ink); background: var(--paper); }
+.web-option-line { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px dashed color-mix(in oklch, var(--ink), transparent 25%); border-radius: 12px; font-weight: 700; }
+.web-option-line input { margin-top: 4px; }
+@media (max-width: 720px) { .web-practice-head { align-items: flex-start; flex-direction: column; } }
+
+
+/* v32: verified web-practice readability and jump positioning */
+.pdf-viewer-card,
+.pdf-text-shell { scroll-margin-top: 18px; }
+.web-practice-page { font-size: clamp(16px, 1.05vw, 18px); line-height: 1.72; max-width: 100%; overflow: hidden; }
+.web-practice-page p,
+.web-question-line span,
+.web-option-line span { font-size: clamp(16px, 1.05vw, 18px); line-height: 1.72; }
+.web-practice-head { font-size: clamp(15px, .98vw, 17px); }
+.web-practice-page h4 { line-height: 1.35; }
+.web-question-line { overflow-wrap: anywhere; }
+.web-question-line b { flex: 0 0 auto; font-size: .95rem; }
+@media (max-width: 720px) {
+  .web-practice-page { gap: 11px; padding: 14px; border-radius: 16px; box-shadow: 3px 3px 0 var(--ink); }
+  .web-question-line { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .web-question-line b { width: fit-content; min-width: 28px; height: 28px; }
+}
